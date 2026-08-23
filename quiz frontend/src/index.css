@@ -1,0 +1,1021 @@
+:root {
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f6f6f7;
+
+  --border: #e4e4e7;
+  --text: #18181b;
+  --dim: #71717a;
+
+  --amber: #2f5fed;
+  --teal: #0e9f6e;
+  --coral: #e5484d;
+  --gold: #b7791f;
+
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-family: "Space Grotesk", sans-serif;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: 1.9rem;
+  font-weight: 700;
+}
+
+h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+h3 {
+  font-size: 1rem;
+}
+
+p {
+  line-height: 1.5;
+}
+
+a {
+  color: var(--amber);
+  text-decoration: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.eyebrow {
+  margin-bottom: 6px;
+  color: var(--dim);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dim {
+  color: var(--dim);
+}
+
+.empty {
+  color: var(--dim);
+  font-style: italic;
+}
+
+.error {
+  min-height: 1em;
+  margin: 0 0 16px;
+  color: var(--coral);
+  font-size: 0.85rem;
+}
+
+/* ================= NAVBAR ================= */
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border);
+  background: #fff;
+}
+
+.nav-brand {
+  color: var(--text);
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.nav-brand span {
+  color: var(--amber);
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.nav-user {
+  color: var(--text);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.82rem;
+}
+
+.nav-user em {
+  margin-left: 6px;
+  color: var(--amber);
+  font-style: normal;
+}
+
+/* ================= BUTTONS ================= */
+
+.btn {
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.1s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: var(--text);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--amber);
+}
+
+.btn-secondary {
+  display: inline-block;
+  border-color: var(--border);
+  background: #fff;
+  color: var(--text);
+}
+
+.btn-secondary:hover {
+  border-color: var(--text);
+}
+
+.btn-ghost {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--dim);
+}
+
+.btn-ghost:hover {
+  border-color: var(--text);
+  color: var(--text);
+}
+
+/* ================= PAGE ================= */
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 36px 24px 80px;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: 14px;
+  color: var(--dim);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.8rem;
+}
+
+.back:hover {
+  color: var(--text);
+}
+
+/* ================= AUTH ================= */
+
+.auth-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 65px);
+  padding: 24px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  padding: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.stack label,
+.create-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--dim);
+  font-size: 0.84rem;
+}
+
+input,
+select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 0.94rem;
+}
+
+input:focus,
+select:focus {
+  border-color: var(--amber);
+  background: #fff;
+  outline: none;
+}
+
+.switch {
+  margin-top: 18px;
+  color: var(--dim);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* ================= CARDS ================= */
+
+.card {
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.card-grid,
+.quiz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+/* ================= ADMIN DASHBOARD ================= */
+
+.admin-dashboard {
+  max-width: 1100px;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.dashboard-header p {
+  margin: 8px 0 0;
+}
+
+.dashboard-section {
+  margin-top: 34px;
+}
+
+.section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.section-header .dim {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+/* ================= DASHBOARD STATS ================= */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+
+.stat-card {
+  min-height: 110px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.stat-label {
+  display: block;
+  color: var(--dim);
+  font-size: 0.8rem;
+}
+
+.stat-number {
+  display: block;
+  margin-top: 12px;
+  color: var(--text);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+/* ================= CREATE QUIZ ================= */
+
+.create-quiz-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.create-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.create-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.create-form-footer p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+/* ================= QUIZ CARDS ================= */
+
+.quiz-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 220px;
+  padding: 20px;
+}
+
+.quiz-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 24px;
+}
+
+.quiz-card-content {
+  flex: 1;
+  margin-top: 12px;
+}
+
+.quiz-card-content h2 {
+  margin-bottom: 8px;
+}
+
+.quiz-description {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.quiz-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.quiz-card-footer .dim {
+  font-size: 0.75rem;
+}
+
+/* ================= BADGES ================= */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--dim);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+}
+
+.status-draft,
+.badge-draft {
+  border-color: var(--border);
+  color: var(--dim);
+}
+
+.status-ready,
+.badge-ready {
+  border-color: var(--teal);
+  background: rgba(14, 159, 110, 0.06);
+  color: var(--teal);
+}
+
+.status-live,
+.badge-live {
+  border-color: var(--coral);
+  background: rgba(229, 72, 77, 0.06);
+  color: var(--coral);
+}
+
+.status-completed,
+.badge-completed {
+  border-color: var(--amber);
+  background: rgba(47, 95, 237, 0.06);
+  color: var(--amber);
+}
+
+/* ================= EMPTY STATE ================= */
+
+.empty-dashboard {
+  padding: 40px;
+  text-align: center;
+}
+
+.empty-dashboard h3 {
+  margin-bottom: 8px;
+}
+
+.empty-dashboard p {
+  max-width: 420px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.dashboard-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+/* ================= QUIZ MANAGEMENT ================= */
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+}
+
+.inline-form input {
+  min-width: 220px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 18px;
+}
+
+.q-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.row {
+  display: flex;
+  gap: 14px;
+}
+
+.row label {
+  flex: 1;
+}
+
+/* ================= LIVE QUIZ ================= */
+
+.live-card {
+  border-color: var(--text);
+}
+
+.live-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  border: 2px solid var(--text);
+  border-radius: 50%;
+  color: var(--text);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.opt-btn {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-size: 0.94rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.opt-btn:hover:not(:disabled) {
+  border-color: var(--text);
+  background: var(--panel-2);
+}
+
+.opt-btn:disabled {
+  cursor: default;
+}
+
+.opt-correct {
+  border-color: var(--teal);
+  background: rgba(14, 159, 110, 0.08);
+  color: var(--teal);
+}
+
+.opt-wrong {
+  border-color: var(--coral);
+  background: rgba(229, 72, 77, 0.08);
+  color: var(--coral);
+}
+
+.opt-reveal {
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+.feedback {
+  margin-top: 14px;
+  font-weight: 600;
+}
+
+.feedback.ok {
+  color: var(--teal);
+}
+
+.feedback.no {
+  color: var(--coral);
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 14px;
+  border-radius: 50%;
+  background: var(--teal);
+  animation: pulse 1.2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* ================= FINAL QUIZ RESULTS ================= */
+
+.result-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.result-stats p {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.result-stats strong {
+  color: var(--dim);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ================= LEADERBOARD ================= */
+
+/*
+  Important:
+  Leaderboard.jsx already returns:
+  <div className="card leaderboard">
+
+  Therefore, do NOT wrap it in another
+  .leaderboard card in the parent component.
+*/
+
+.leaderboard {
+  margin-top: 22px;
+  overflow: hidden;
+}
+
+.leaderboard .eyebrow {
+  margin-bottom: 12px;
+}
+
+/* Winner banner */
+
+.winner-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 14px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(183, 121, 31, 0.25);
+  border-radius: 8px;
+  background: rgba(183, 121, 31, 0.07);
+  color: var(--text);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.winner-banner strong {
+  color: var(--gold);
+}
+
+/* Leaderboard table */
+
+.score-table {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: "Inter", sans-serif;
+}
+
+.score-table thead {
+  background: var(--panel-2);
+}
+
+.score-table th {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--dim);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.score-table td {
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+
+.score-table tbody tr {
+  background: #fff;
+  transition: background 0.15s ease;
+}
+
+.score-table tbody tr:hover {
+  background: var(--panel-2);
+}
+
+.score-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Rank column */
+
+.score-table .rank {
+  width: 80px;
+  color: var(--dim);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+/* Player column */
+
+.score-table .name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Correct answers column */
+
+.score-table td:nth-child(3) {
+  width: 110px;
+  color: var(--teal);
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+}
+
+/* Points column */
+
+.score-table .score {
+  width: 100px;
+  color: var(--amber);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* Current logged-in user */
+
+.me-row,
+.score-table tbody tr.me-row {
+  background: rgba(47, 95, 237, 0.07);
+}
+
+.score-table tbody tr.me-row:hover {
+  background: rgba(47, 95, 237, 0.1);
+}
+
+.me-row .name {
+  color: var(--amber);
+}
+
+/* Top 3 positions */
+
+.score-table tbody tr:nth-child(1) .rank {
+  color: var(--gold);
+}
+
+.score-table tbody tr:nth-child(2) .rank {
+  color: #71717a;
+}
+
+.score-table tbody tr:nth-child(3) .rank {
+  color: #9a5b34;
+}
+/* ================= ADMIN LEADERBOARD ================= */
+
+.admin-leaderboard-section {
+  margin-top: 24px;
+}
+
+.leaderboard-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.leaderboard-section-head h2 {
+  margin: 0;
+}
+
+.leaderboard-section-head .eyebrow {
+  margin-bottom: 6px;
+}
+
+/* Admin leaderboard spacing */
+.admin-leaderboard-section .leaderboard {
+  margin-top: 0;
+}
+
+/* Responsive */
+@media (max-width: 520px) {
+  .leaderboard-section-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .leaderboard-section-head .btn {
+    width: 100%;
+  }
+}
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 900px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .result-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .nav {
+    padding: 14px 18px;
+  }
+
+  .page {
+    padding: 28px 18px 60px;
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+  }
+
+  .dashboard-header .btn {
+    width: 100%;
+  }
+
+  .split {
+    grid-template-columns: 1fr;
+  }
+
+  .create-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .create-form-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .create-form-footer .btn {
+    width: 100%;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .score-table th,
+  .score-table td {
+    padding: 11px 10px;
+  }
+}
+
+@media (max-width: 520px) {
+  h1 {
+    font-size: 1.55rem;
+  }
+
+  .nav {
+    gap: 12px;
+  }
+
+  .nav-right {
+    gap: 8px;
+  }
+
+  .nav-user {
+    display: none;
+  }
+
+  .page-head {
+    align-items: stretch;
+  }
+
+  .options {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .result-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-card {
+    min-height: 90px;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .quiz-card-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .quiz-card-footer .btn {
+    width: 100%;
+  }
+
+  .inline-form {
+    flex-direction: column;
+  }
+
+  .inline-form input {
+    min-width: 100%;
+  }
+
+  /* Mobile leaderboard */
+
+  .leaderboard {
+    padding: 16px;
+  }
+
+  .score-table {
+    font-size: 0.8rem;
+  }
+
+  .score-table th,
+  .score-table td {
+    padding: 10px 7px;
+  }
+
+  .score-table th {
+    font-size: 0.58rem;
+  }
+
+  .score-table .rank {
+    width: 50px;
+    font-size: 0.72rem;
+  }
+
+  .score-table td:nth-child(3) {
+    width: 65px;
+  }
+
+  .score-table .score {
+    width: 70px;
+    font-size: 0.78rem;
+  }
+
+  .winner-banner {
+    padding: 12px;
+    font-size: 0.85rem;
+  }
+}

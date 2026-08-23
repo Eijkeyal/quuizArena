@@ -11,22 +11,24 @@ import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// ==================== USERS ====================
+// ============================================================
+// USERS
+// ============================================================
 
-// ADMIN: Get all users
 // GET /users
+// Get all users except the currently logged-in user
 router.get("/", authMiddleware, getAllUsers);
 
-// Get one user
 // GET /users/:id
+// Get one user
 router.get("/:id", authMiddleware, getUser);
 
-// Update own account
 // PUT /users/:id
+// Update own account
 router.put("/:id", authMiddleware, updateUser);
 
-// Delete own account
 // DELETE /users/:id
+// Delete own account
 router.delete("/:id", authMiddleware, deleteUser);
 
 export default router;

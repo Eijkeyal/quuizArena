@@ -1,20 +1,32 @@
-import Message from "../models/message.js";
+import mongoose from "mongoose";
+import PrivateMessage from "../models/privateMessage.js";
 import Conversation from "../models/Conversation.js";
 
-// message create
+// ============================================================
+// CREATE PRIVATE MESSAGE
+// POST /conversations/:conversationId/messages
+// ============================================================
 export const createMessage = async (req, res) => {
   try {
     const { conversationId } = req.params;
     const { content } = req.body;
     const senderId = req.userId;
 
-    if (!content) {
+    // Validate conversation ID
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({
+        message: "Invalid conversation ID",
+      });
+    }
+
+    // Validate content
+    if (!content || !content.trim()) {
       return res.status(400).json({
         message: "Content is required",
       });
     }
 
-    // find the conversation document
+    // Find conversation
     const conversation = await Conversation.findById(conversationId);
 
     if (!conversation) {
@@ -23,9 +35,10 @@ export const createMessage = async (req, res) => {
       });
     }
 
+    // Check participant
     const isParticipant =
-      conversation.user1Id.toString() === senderId ||
-      conversation.user2Id.toString() === senderId;
+      conversation.user1Id.toString() === senderId.toString() ||
+      conversation.user2Id.toString() === senderId.toString();
 
     if (!isParticipant) {
       return res.status(403).json({
@@ -33,36 +46,61 @@ export const createMessage = async (req, res) => {
       });
     }
 
-    const message = await Message.create({
+    // Create message
+    let message = await PrivateMessage.create({
       conversationId,
       senderId,
-      content,
+      content: content.trim(),
     });
 
-    // Update conversation activity time
+    // Populate sender information
+    message = await message.populate("senderId", "name email");
+
+    // Update conversation activity
     conversation.updatedAt = new Date();
     await conversation.save();
-    //broadcast messages in real time 
+
+    // Get Socket.IO instance
     const io = req.app.get("io");
 
+    // Broadcast to both users in conversation
     if (io) {
-      io.to(conversationId).emit("newMessage", message);
+      io.to(`conversation:${conversationId}`).emit("newMessage", message);
     }
 
-    res.status(201).json(message);
-  } catch (err) {
-    res.status(500).json({
-      message: err.message,
+    return res.status(201).json(message);
+  } catch (error) {
+    console.error("Create private message error:", error);
+
+    return res.status(500).json({
+      message: error.message,
     });
   }
 };
 
-//get message
+// ============================================================
+// GET PRIVATE MESSAGES
+// GET /conversations/:conversationId/messages
+// ============================================================
 export const getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const { page = 1, limit = 10 } = req.query;
 
+    let page = Number(req.query.page) || 1;
+    let limit = Number(req.query.limit) || 20;
+
+    // Validate conversation ID
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({
+        message: "Invalid conversation ID",
+      });
+    }
+
+    // Prevent invalid pagination
+    page = Math.max(page, 1);
+    limit = Math.min(Math.max(limit, 1), 100);
+
+    // Find conversation
     const conversation = await Conversation.findById(conversationId);
 
     if (!conversation) {
@@ -73,9 +111,10 @@ export const getMessages = async (req, res) => {
 
     const myId = req.userId;
 
+    // Check participant
     const isParticipant =
-      conversation.user1Id.toString() === myId ||
-      conversation.user2Id.toString() === myId;
+      conversation.user1Id.toString() === myId.toString() ||
+      conversation.user2Id.toString() === myId.toString();
 
     if (!isParticipant) {
       return res.status(403).json({
@@ -83,32 +122,49 @@ export const getMessages = async (req, res) => {
       });
     }
 
-    const messages = await Message.find({ conversationId })
+    // Get messages
+    const messages = await PrivateMessage.find({
+      conversationId,
+    })
       .sort({ createdAt: -1 })
-      .skip((Number(page) - 1) * Number(limit))
-      .limit(Number(limit));
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate("senderId", "name email");
 
-    // Return oldest to newest
-    res.json(messages.reverse());
-  } catch (err) {
-    res.status(500).json({
-      message: err.message,
+    // Return oldest → newest
+    messages.reverse();
+
+    return res.status(200).json(messages);
+  } catch (error) {
+    console.error("Get private messages error:", error);
+
+    return res.status(500).json({
+      message: error.message,
     });
   }
 };
 
-// update message
+// ============================================================
+// UPDATE PRIVATE MESSAGE
+// PATCH /messages/:id
+// ============================================================
 export const updateMessage = async (req, res) => {
   try {
     const { content } = req.body;
 
-    if (!content) {
+    if (!content || !content.trim()) {
       return res.status(400).json({
         message: "Content is required",
       });
     }
 
-    const message = await Message.findById(req.params.id);
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: "Invalid message ID",
+      });
+    }
+
+    const message = await PrivateMessage.findById(req.params.id);
 
     if (!message) {
       return res.status(404).json({
@@ -116,35 +172,52 @@ export const updateMessage = async (req, res) => {
       });
     }
 
-    // Only sender can update
-    if (message.senderId.toString() !== req.userId) {
+    // Only sender can edit
+    if (message.senderId.toString() !== req.userId.toString()) {
       return res.status(403).json({
         message: "You can only edit your own messages",
       });
     }
 
-    message.content = content;
+    message.content = content.trim();
+
     await message.save();
 
-    // broadcast Real-time update
+    const updatedMessage = await message.populate("senderId", "name email");
+
+    // Broadcast update to conversation room
     const io = req.app.get("io");
 
     if (io) {
-      io.to(message.conversationId.toString()).emit("messageUpdated", message);
+      io.to(`conversation:${message.conversationId}`).emit(
+        "messageUpdated",
+        updatedMessage,
+      );
     }
 
-    res.json(message);
+    return res.status(200).json(updatedMessage);
   } catch (error) {
-    res.status(500).json({
+    console.error("Update private message error:", error);
+
+    return res.status(500).json({
       message: error.message,
     });
   }
 };
 
-// delete message
+// ============================================================
+// DELETE PRIVATE MESSAGE
+// DELETE /messages/:id
+// ============================================================
 export const deleteMessage = async (req, res) => {
   try {
-    const message = await Message.findById(req.params.id);
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: "Invalid message ID",
+      });
+    }
+
+    const message = await PrivateMessage.findById(req.params.id);
 
     if (!message) {
       return res.status(404).json({
@@ -153,29 +226,34 @@ export const deleteMessage = async (req, res) => {
     }
 
     // Only sender can delete
-    if (message.senderId.toString() !== req.userId) {
+    if (message.senderId.toString() !== req.userId.toString()) {
       return res.status(403).json({
         message: "You can only delete your own messages",
       });
     }
 
     const conversationId = message.conversationId.toString();
+    const messageId = message._id.toString();
 
     await message.deleteOne();
+
+    // Broadcast deletion
     const io = req.app.get("io");
 
     if (io) {
-      io.to(conversationId).emit("messageDeleted", {
-        id: req.params.id,
+      io.to(`conversation:${conversationId}`).emit("messageDeleted", {
+        id: messageId,
       });
     }
 
-    res.json({
+    return res.status(200).json({
       message: "Message deleted",
     });
-  } catch (err) {
-    res.status(500).json({
-      message: err.message,
+  } catch (error) {
+    console.error("Delete private message error:", error);
+
+    return res.status(500).json({
+      message: error.message,
     });
   }
 };

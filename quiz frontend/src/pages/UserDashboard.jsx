@@ -7,97 +7,134 @@ import {
   X,
   Send,
   MessageCircle,
+  ArrowLeft,
 } from "lucide-react";
 import { io } from "socket.io-client";
 import * as api from "../api";
 import { useAuth } from "../context/AuthContext";
 
-// ============================================================
-// CONFIG
-// ============================================================
-
-const SOCKET_URL = "http://localhost:3000";
-
-// Use the conversation that should be used for the lobby chat.
-// Change this to your real conversation ID.
-const CONVERSATION_ID = "6a834a191a6282676e99c9c5";
+const SOCKET_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 // ============================================================
 // HELPERS
 // ============================================================
 
+function getId(value) {
+  if (!value) return null;
+
+  if (typeof value === "object") {
+    return value._id || value.id || null;
+  }
+
+  return value;
+}
+
 function getMessageId(message) {
-  return message?._id || message?.id;
+  return getId(message?._id || message?.id);
 }
 
 function getSenderId(message) {
-  if (!message) return null;
+  // Different backends name this field differently -
+  // check every common variant so "mine vs theirs"
+  // detection doesn't silently fail.
+  return getId(
+    message?.senderId ??
+      message?.sender ??
+      message?.userId ??
+      message?.author
+  );
+}
 
-  if (typeof message.senderId === "object") {
-    return (
-      message.senderId?._id ||
-      message.senderId?.id ||
-      null
+// ============================================================
+// DECODE JWT (fallback for getting the logged-in user's id
+// when the auth context doesn't expose it directly)
+// ============================================================
+
+function decodeJwt(token) {
+  if (!token) return null;
+
+  try {
+    const payload = token.split(".")[1];
+    const base64 = payload
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map(
+          (c) =>
+            "%" +
+            c.charCodeAt(0).toString(16).padStart(2, "0")
+        )
+        .join("")
     );
+    return JSON.parse(json);
+  } catch {
+    return null;
   }
+}
 
-  return message.senderId || null;
+function getMessageContent(message) {
+  return message?.content || "";
 }
 
 function getSenderName(message) {
-  if (!message) return "User";
-
-  if (message.senderId?.name) {
+  if (message?.senderId?.name) {
     return message.senderId.name;
   }
 
-  if (message.sender?.name) {
+  if (message?.sender?.name) {
     return message.sender.name;
-  }
-
-  if (message.user?.name) {
-    return message.user.name;
-  }
-
-  if (message.userName) {
-    return message.userName;
   }
 
   return "User";
 }
 
-function getMessageContent(message) {
-  return (
-    message?.content ||
-    message?.text ||
-    ""
-  );
-}
-
-function getMessageCreatedAt(message) {
-  return (
-    message?.createdAt ||
-    message?.created_at ||
-    Date.now()
-  );
-}
-
-function getMessageEditedAt(message) {
-  return (
-    message?.editedAt ||
-    message?.updatedAt ||
-    null
-  );
-}
-
 function formatTime(timestamp) {
-  return new Date(timestamp).toLocaleTimeString(
-    [],
-    {
-      hour: "2-digit",
-      minute: "2-digit",
-    },
-  );
+  if (!timestamp) return "";
+
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// ============================================================
+// EXTRACT CONVERSATION
+// Handles multiple backend response formats
+// ============================================================
+
+function extractConversation(data) {
+  if (!data) {
+    return null;
+  }
+
+  // Backend returns:
+  // { _id: "...", user1: "...", user2: "..." }
+  if (data._id || data.id) {
+    return data;
+  }
+
+  // Backend returns:
+  // { conversation: { _id: "..." } }
+  if (data.conversation) {
+    return data.conversation;
+  }
+
+  // Backend returns:
+  // { data: { _id: "..." } }
+  if (data.data) {
+    if (data.data._id || data.data.id) {
+      return data.data;
+    }
+
+    if (data.data.conversation) {
+      return data.data.conversation;
+    }
+  }
+
+  return null;
 }
 
 // ============================================================
@@ -106,7 +143,6 @@ function formatTime(timestamp) {
 
 export default function UserDashboard() {
   const navigate = useNavigate();
-
   const { user } = useAuth();
 
   // ==========================================================
@@ -123,33 +159,30 @@ export default function UserDashboard() {
 
   const [chatOpen, setChatOpen] = useState(false);
 
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+
+  const [selectedUser, setSelectedUser] = useState(null);
+
+  const [conversation, setConversation] = useState(null);
+
   const [messages, setMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
 
   const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
 
-  const [editingId, setEditingId] =
-    useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState("");
 
-  const [editDraft, setEditDraft] =
-    useState("");
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
-  const [pendingDeleteId, setPendingDeleteId] =
-    useState(null);
-
-  const [chatLoading, setChatLoading] =
-    useState(false);
-
-  const [sending, setSending] =
-    useState(false);
-
-  const [chatError, setChatError] =
-    useState("");
+  const [chatError, setChatError] = useState("");
 
   const [socketConnected, setSocketConnected] =
     useState(false);
 
   const listRef = useRef(null);
-
   const socketRef = useRef(null);
 
   // ==========================================================
@@ -158,14 +191,22 @@ export default function UserDashboard() {
 
   const token =
     localStorage.getItem("accessToken") ||
-    localStorage.getItem("token");
+    localStorage.getItem("token") ||
+    sessionStorage.getItem("token");
 
   // ==========================================================
-  // CURRENT USER ID
+  // CURRENT USER
   // ==========================================================
 
   const currentUserId =
-    user?._id || user?.id || null;
+    user?._id ||
+    user?.id ||
+    user?.userId ||
+    decodeJwt(token)?._id ||
+    decodeJwt(token)?.id ||
+    decodeJwt(token)?.userId ||
+    decodeJwt(token)?.sub ||
+    null;
 
   // ==========================================================
   // LOAD QUIZZES
@@ -177,29 +218,27 @@ export default function UserDashboard() {
         setLoading(true);
         setError("");
 
-        const allQuizzes =
-          await api.getQuizzes();
+        const allQuizzes = await api.getQuizzes();
 
-        const availableQuizzes =
-          Array.isArray(allQuizzes)
-            ? allQuizzes.filter(
-                (quiz) =>
-                  quiz.status === "READY" ||
-                  quiz.status === "LIVE",
-              )
-            : [];
+        const availableQuizzes = Array.isArray(allQuizzes)
+          ? allQuizzes.filter(
+              (quiz) =>
+                quiz.status === "READY" ||
+                quiz.status === "LIVE"
+            )
+          : [];
 
         setQuizzes(availableQuizzes);
       } catch (err) {
         console.error(
           "Failed to load quizzes:",
-          err,
+          err
         );
 
         setError(
           err?.response?.data?.message ||
             err?.message ||
-            "Failed to load quizzes",
+            "Failed to load quizzes"
         );
       } finally {
         setLoading(false);
@@ -210,7 +249,7 @@ export default function UserDashboard() {
   }, []);
 
   // ==========================================================
-  // CONNECT SOCKET.IO
+  // SOCKET CONNECTION
   // ==========================================================
 
   useEffect(() => {
@@ -219,7 +258,7 @@ export default function UserDashboard() {
     }
 
     console.log(
-      "Connecting to Socket.IO...",
+      "Connecting to Socket.IO..."
     );
 
     const socket = io(SOCKET_URL, {
@@ -230,141 +269,111 @@ export default function UserDashboard() {
 
     socketRef.current = socket;
 
-    // --------------------------------------------------------
-    // CONNECT
-    // --------------------------------------------------------
-
     socket.on("connect", () => {
       console.log(
         "Socket connected:",
-        socket.id,
+        socket.id
       );
 
       setSocketConnected(true);
+    });
 
-      // Join the conversation room
-      socket.emit(
-        "joinConversation",
-        CONVERSATION_ID,
+    socket.on("connect_error", (err) => {
+      console.error(
+        "Socket connection error:",
+        err
+      );
+
+      setSocketConnected(false);
+
+      setChatError(
+        "Could not connect to chat server."
       );
     });
 
-    // --------------------------------------------------------
-    // CONNECTION ERROR
-    // --------------------------------------------------------
-
-    socket.on(
-      "connect_error",
-      (err) => {
-        console.error(
-          "Socket connection error:",
-          err,
-        );
-
-        setSocketConnected(false);
-
-        setChatError(
-          "Could not connect to chat server.",
-        );
-      },
-    );
-
-    // --------------------------------------------------------
-    // DISCONNECT
-    // --------------------------------------------------------
-
     socket.on("disconnect", () => {
       console.log(
-        "Socket disconnected",
+        "Socket disconnected:",
+        socket.id
       );
 
       setSocketConnected(false);
     });
 
-    // --------------------------------------------------------
+    // ========================================================
     // NEW MESSAGE
-    // --------------------------------------------------------
+    // ========================================================
 
     socket.on(
       "newMessage",
       (message) => {
         console.log(
-          "New message:",
-          message,
+          "New private message:",
+          message
         );
 
         setMessages((prev) => {
           const newId =
             getMessageId(message);
 
-          // Prevent duplicates
+          if (!newId) {
+            return [...prev, message];
+          }
+
           const exists = prev.some(
             (existingMessage) =>
               String(
                 getMessageId(
-                  existingMessage,
-                ),
-              ) === String(newId),
+                  existingMessage
+                )
+              ) === String(newId)
           );
 
           if (exists) {
             return prev;
           }
 
-          return [
-            ...prev,
-            message,
-          ];
+          return [...prev, message];
         });
-      },
+      }
     );
 
-    // --------------------------------------------------------
+    // ========================================================
     // MESSAGE UPDATED
-    // --------------------------------------------------------
+    // ========================================================
 
     socket.on(
       "messageUpdated",
       (updatedMessage) => {
-        console.log(
-          "Message updated:",
-          updatedMessage,
-        );
-
         const updatedId =
           getMessageId(
-            updatedMessage,
+            updatedMessage
           );
 
         setMessages((prev) =>
           prev.map((message) =>
             String(
-              getMessageId(message),
+              getMessageId(message)
             ) === String(updatedId)
               ? updatedMessage
-              : message,
-          ),
+              : message
+          )
         );
-      },
+      }
     );
 
-    // --------------------------------------------------------
+    // ========================================================
     // MESSAGE DELETED
-    // --------------------------------------------------------
+    // ========================================================
 
     socket.on(
       "messageDeleted",
       (deletedMessage) => {
-        console.log(
-          "Message deleted:",
-          deletedMessage,
-        );
-
         const deletedId =
           typeof deletedMessage ===
           "object"
             ? getMessageId(
-                deletedMessage,
+                deletedMessage
               )
             : deletedMessage;
 
@@ -372,36 +381,20 @@ export default function UserDashboard() {
           prev.filter(
             (message) =>
               String(
-                getMessageId(message),
-              ) !== String(
-                deletedId,
-              ),
-          ),
+                getMessageId(message)
+              ) !== String(deletedId)
+          )
         );
-      },
+      }
     );
 
-    // --------------------------------------------------------
-    // CLEANUP
-    // --------------------------------------------------------
-
     return () => {
-      console.log(
-        "Cleaning Socket.IO connection",
-      );
-
       socket.off("connect");
-      socket.off(
-        "connect_error",
-      );
+      socket.off("connect_error");
       socket.off("disconnect");
       socket.off("newMessage");
-      socket.off(
-        "messageUpdated",
-      );
-      socket.off(
-        "messageDeleted",
-      );
+      socket.off("messageUpdated");
+      socket.off("messageDeleted");
 
       socket.disconnect();
 
@@ -410,76 +403,493 @@ export default function UserDashboard() {
   }, [token, user]);
 
   // ==========================================================
-  // LOAD MESSAGE HISTORY
+  // JOIN CONVERSATION ROOM
   // ==========================================================
 
   useEffect(() => {
-    if (!chatOpen) {
+    const conversationId =
+      getId(conversation);
+
+    if (!socketConnected) {
       return;
     }
 
-    if (!token) {
+    if (!conversationId) {
+      return;
+    }
+
+    console.log(
+      "Joining conversation:",
+      conversationId
+    );
+
+    socketRef.current?.emit(
+      "joinConversation",
+      conversationId
+    );
+
+    return () => {
+      console.log(
+        "Leaving conversation:",
+        conversationId
+      );
+
+      socketRef.current?.emit(
+        "leaveConversation",
+        conversationId
+      );
+    };
+  }, [
+    conversation,
+    socketConnected,
+  ]);
+
+  // ==========================================================
+  // OPEN CHAT
+  // ==========================================================
+
+  async function openChat() {
+    setChatOpen(true);
+    setChatError("");
+
+    if (users.length > 0) {
+      return;
+    }
+
+    try {
+      setUsersLoading(true);
+
+      const data =
+        await api.getChatUsers();
+
+      console.log(
+        "Chat users:",
+        data
+      );
+
+      setUsers(
+        Array.isArray(data)
+          ? data
+          : []
+      );
+    } catch (err) {
+      console.error(
+        "Failed to load users:",
+        err
+      );
+
       setChatError(
-        "You are not logged in.",
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to load users"
+      );
+    } finally {
+      setUsersLoading(false);
+    }
+  }
+
+  // ==========================================================
+  // SELECT USER
+  // ==========================================================
+
+  async function selectUser(otherUser) {
+    const otherUserId =
+      getId(otherUser);
+
+    if (!otherUserId) {
+      setChatError(
+        "Invalid user selected."
+      );
+      return;
+    }
+
+    try {
+      setSelectedUser(otherUser);
+
+      setConversation(null);
+      setMessages([]);
+
+      setChatError("");
+      setMessagesLoading(true);
+
+      console.log(
+        "Creating/getting conversation with:",
+        otherUserId
+      );
+
+      const response =
+        await api.createConversation(
+          otherUserId
+        );
+
+      console.log(
+        "Create conversation response:",
+        response
+      );
+
+      // IMPORTANT:
+      // Handles:
+      // response._id
+      // response.conversation._id
+      // response.data._id
+      const conversationData =
+        extractConversation(
+          response
+        );
+
+      console.log(
+        "Extracted conversation:",
+        conversationData
+      );
+
+      const conversationId =
+        getId(
+          conversationData
+        );
+
+      if (!conversationId) {
+        console.error(
+          "Backend returned invalid conversation:",
+          response
+        );
+
+        setChatError(
+          "Backend did not return a valid conversation."
+        );
+
+        setConversation(null);
+
+        return;
+      }
+
+      console.log(
+        "Valid conversation ID:",
+        conversationId
+      );
+
+      setConversation(
+        conversationData
+      );
+
+      // ======================================================
+      // LOAD OLD MESSAGES
+      // ======================================================
+
+      const messageResponse =
+        await api.getMessages(
+          conversationId
+        );
+
+      console.log(
+        "Messages response:",
+        messageResponse
+      );
+
+      // Support:
+      // []
+      // { messages: [] }
+      // { data: [] }
+
+      let loadedMessages = [];
+
+      if (
+        Array.isArray(
+          messageResponse
+        )
+      ) {
+        loadedMessages =
+          messageResponse;
+      } else if (
+        Array.isArray(
+          messageResponse?.messages
+        )
+      ) {
+        loadedMessages =
+          messageResponse.messages;
+      } else if (
+        Array.isArray(
+          messageResponse?.data
+        )
+      ) {
+        loadedMessages =
+          messageResponse.data;
+      }
+
+      setMessages(
+        loadedMessages
+      );
+    } catch (err) {
+      console.error(
+        "Failed to open conversation:",
+        err
+      );
+
+      setConversation(null);
+      setMessages([]);
+
+      setChatError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to open conversation"
+      );
+    } finally {
+      setMessagesLoading(false);
+    }
+  }
+
+  // ==========================================================
+  // BACK TO USERS
+  // ==========================================================
+
+  function backToUsers() {
+    const conversationId =
+      getId(conversation);
+
+    if (conversationId) {
+      socketRef.current?.emit(
+        "leaveConversation",
+        conversationId
+      );
+    }
+
+    setSelectedUser(null);
+    setConversation(null);
+    setMessages([]);
+
+    setDraft("");
+    setEditingId(null);
+    setEditDraft("");
+    setPendingDeleteId(null);
+
+    setChatError("");
+  }
+
+  // ==========================================================
+  // SEND MESSAGE
+  // ==========================================================
+
+  async function sendMessage() {
+    const content =
+      draft.trim();
+
+    if (!content) {
+      return;
+    }
+
+    const conversationId =
+      getId(conversation);
+
+    console.log(
+      "Sending message to conversation:",
+      conversationId
+    );
+
+    if (!conversationId) {
+      setChatError(
+        "No valid conversation selected."
       );
 
       return;
     }
 
-    async function loadMessages() {
-      try {
-        setChatLoading(true);
-        setChatError("");
-
-        const response =
-          await fetch(
-            `${SOCKET_URL}/conversations/${CONVERSATION_ID}/messages`,
-            {
-              method: "GET",
-
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type":
-                  "application/json",
-              },
-            },
-          );
-
-        const data =
-          await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data?.message ||
-              "Failed to load messages",
-          );
-        }
-
-        const loadedMessages =
-          Array.isArray(data)
-            ? data
-            : data.messages || [];
-
-        setMessages(
-          loadedMessages,
-        );
-      } catch (err) {
-        console.error(
-          "Failed to load messages:",
-          err,
-        );
-
-        setChatError(
-          err?.message ||
-            "Failed to load messages",
-        );
-      } finally {
-        setChatLoading(false);
-      }
+    if (sending) {
+      return;
     }
 
-    loadMessages();
-  }, [chatOpen, token]);
+    try {
+      setSending(true);
+      setChatError("");
+
+      const response =
+        await api.createMessage(
+          conversationId,
+          content
+        );
+
+      console.log(
+        "Message sent:",
+        response
+      );
+
+      setDraft("");
+
+      // In case Socket.IO does not broadcast
+      // the message back, immediately add it.
+      const createdMessage =
+        response?.message ||
+        response?.data ||
+        response;
+
+      if (
+        createdMessage &&
+        getMessageId(
+          createdMessage
+        )
+      ) {
+        setMessages((prev) => {
+          const newId =
+            getMessageId(
+              createdMessage
+            );
+
+          const exists =
+            prev.some(
+              (message) =>
+                String(
+                  getMessageId(
+                    message
+                  )
+                ) === String(newId)
+            );
+
+          if (exists) {
+            return prev;
+          }
+
+          return [
+            ...prev,
+            createdMessage,
+          ];
+        });
+      }
+    } catch (err) {
+      console.error(
+        "Failed to send message:",
+        err
+      );
+
+      setChatError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to send message"
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
+  // ==========================================================
+  // START EDIT
+  // ==========================================================
+
+  function startEdit(message) {
+    const messageId =
+      getMessageId(message);
+
+    if (!messageId) {
+      return;
+    }
+
+    setEditingId(messageId);
+
+    setEditDraft(
+      getMessageContent(message)
+    );
+
+    setPendingDeleteId(null);
+  }
+
+  // ==========================================================
+  // CANCEL EDIT
+  // ==========================================================
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditDraft("");
+  }
+
+  // ==========================================================
+  // SAVE EDIT
+  // ==========================================================
+
+  async function saveEdit(
+    messageId
+  ) {
+    const content =
+      editDraft.trim();
+
+    if (!content) {
+      return;
+    }
+
+    try {
+      setChatError("");
+
+      await api.updateMessage(
+        messageId,
+        content
+      );
+
+      cancelEdit();
+    } catch (err) {
+      console.error(
+        "Failed to edit message:",
+        err
+      );
+
+      setChatError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to edit message"
+      );
+    }
+  }
+
+  // ==========================================================
+  // DELETE MESSAGE
+  // ==========================================================
+
+  async function confirmDelete(
+    messageId
+  ) {
+    try {
+      setChatError("");
+
+      await api.deleteMessage(
+        messageId
+      );
+
+      setMessages((prev) =>
+        prev.filter(
+          (message) =>
+            String(
+              getMessageId(message)
+            ) !==
+            String(messageId)
+        )
+      );
+
+      setPendingDeleteId(null);
+    } catch (err) {
+      console.error(
+        "Failed to delete message:",
+        err
+      );
+
+      setChatError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to delete message"
+      );
+    }
+  }
+
+  // ==========================================================
+  // MESSAGE OWNER
+  // ==========================================================
+
+  function isMyMessage(message) {
+    if (!currentUserId) {
+      return false;
+    }
+
+    return (
+      String(
+        getSenderId(message)
+      ) ===
+      String(currentUserId)
+    );
+  }
 
   // ==========================================================
   // AUTO SCROLL
@@ -505,317 +915,30 @@ export default function UserDashboard() {
       setError("");
 
       await api.joinQuiz(
-        quizId,
+        quizId
       );
 
       navigate(
-        `/play/${quizId}`,
+        `/play/${quizId}`
       );
     } catch (err) {
-      // Already joined
       if (
         err?.response?.status ===
         409
       ) {
         navigate(
-          `/play/${quizId}`,
+          `/play/${quizId}`
         );
 
         return;
       }
 
       setError(
-        err?.response?.data
-          ?.message ||
+        err?.response?.data?.message ||
           err?.message ||
-          "Failed to join quiz",
+          "Failed to join quiz"
       );
     }
-  }
-
-  // ==========================================================
-  // SEND MESSAGE
-  // ==========================================================
-
-  async function sendMessage() {
-    const content =
-      draft.trim();
-
-    if (!content) {
-      return;
-    }
-
-    if (!token) {
-      setChatError(
-        "You are not authenticated.",
-      );
-
-      return;
-    }
-
-    if (sending) {
-      return;
-    }
-
-    try {
-      setSending(true);
-      setChatError("");
-
-      const response =
-        await fetch(
-          `${SOCKET_URL}/conversations/${CONVERSATION_ID}/messages`,
-          {
-            method: "POST",
-
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type":
-                "application/json",
-            },
-
-            body: JSON.stringify({
-              content,
-            }),
-          },
-        );
-
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-            "Failed to send message",
-        );
-      }
-
-      console.log(
-        "Message sent:",
-        data,
-      );
-
-      /*
-       * Do NOT add the message
-       * manually here.
-       *
-       * Socket.IO should send
-       * "newMessage" back to
-       * the connected clients.
-       */
-
-      setDraft("");
-    } catch (err) {
-      console.error(
-        "Failed to send message:",
-        err,
-      );
-
-      setChatError(
-        err?.message ||
-          "Failed to send message",
-      );
-    } finally {
-      setSending(false);
-    }
-  }
-
-  // ==========================================================
-  // START EDIT
-  // ==========================================================
-
-  function startEdit(message) {
-    const messageId =
-      getMessageId(message);
-
-    setEditingId(
-      messageId,
-    );
-
-    setEditDraft(
-      getMessageContent(
-        message,
-      ),
-    );
-
-    setPendingDeleteId(
-      null,
-    );
-  }
-
-  // ==========================================================
-  // CANCEL EDIT
-  // ==========================================================
-
-  function cancelEdit() {
-    setEditingId(null);
-    setEditDraft("");
-  }
-
-  // ==========================================================
-  // SAVE EDIT
-  // ==========================================================
-
-  async function saveEdit(
-    messageId,
-  ) {
-    const content =
-      editDraft.trim();
-
-    if (!content) {
-      return;
-    }
-
-    try {
-      setChatError("");
-
-      const response =
-        await fetch(
-          `${SOCKET_URL}/messages/${messageId}`,
-          {
-            method: "PUT",
-
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type":
-                "application/json",
-            },
-
-            body: JSON.stringify({
-              content,
-            }),
-          },
-        );
-
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-            "Failed to update message",
-        );
-      }
-
-      const updatedMessage =
-        data.message ||
-        data;
-
-      setMessages((prev) =>
-        prev.map(
-          (message) =>
-            String(
-              getMessageId(
-                message,
-              ),
-            ) ===
-            String(messageId)
-              ? updatedMessage
-              : message,
-        ),
-      );
-
-      cancelEdit();
-    } catch (err) {
-      console.error(
-        "Failed to edit message:",
-        err,
-      );
-
-      setChatError(
-        err?.message ||
-          "Failed to edit message",
-      );
-    }
-  }
-
-  // ==========================================================
-  // DELETE MESSAGE
-  // ==========================================================
-
-  async function confirmDelete(
-    messageId,
-  ) {
-    try {
-      setChatError("");
-
-      const response =
-        await fetch(
-          `${SOCKET_URL}/messages/${messageId}`,
-          {
-            method: "DELETE",
-
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type":
-                "application/json",
-            },
-          },
-        );
-
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-            "Failed to delete message",
-        );
-      }
-
-      /*
-       * Remove immediately from UI.
-       *
-       * If your backend also emits
-       * messageDeleted, the socket
-       * handler prevents problems.
-       */
-
-      setMessages((prev) =>
-        prev.filter(
-          (message) =>
-            String(
-              getMessageId(
-                message,
-              ),
-            ) !==
-            String(messageId),
-        ),
-      );
-
-      setPendingDeleteId(
-        null,
-      );
-    } catch (err) {
-      console.error(
-        "Failed to delete message:",
-        err,
-      );
-
-      setChatError(
-        err?.message ||
-          "Failed to delete message",
-      );
-    }
-  }
-
-  // ==========================================================
-  // CHECK MESSAGE OWNER
-  // ==========================================================
-
-  function isMyMessage(
-    message,
-  ) {
-    if (!currentUserId) {
-      return false;
-    }
-
-    const senderId =
-      getSenderId(message);
-
-    return (
-      String(senderId) ===
-      String(currentUserId)
-    );
   }
 
   // ==========================================================
@@ -839,7 +962,7 @@ export default function UserDashboard() {
   return (
     <div className="page">
       {/* ====================================================
-          QUIZ SECTION
+          QUIZZES
       ==================================================== */}
 
       <div className="eyebrow">
@@ -888,7 +1011,7 @@ export default function UserDashboard() {
                   className="btn btn-primary"
                   onClick={() =>
                     onJoin(
-                      quiz._id,
+                      quiz._id
                     )
                   }
                 >
@@ -898,7 +1021,7 @@ export default function UserDashboard() {
                     : "Join and Wait →"}
                 </button>
               </div>
-            ),
+            )
           )}
         </div>
       ) : (
@@ -921,17 +1044,13 @@ export default function UserDashboard() {
           style={
             styles.toggle
           }
-          onClick={() =>
-            setChatOpen(
-              (open) =>
-                !open,
-            )
-          }
-          aria-label={
-            chatOpen
-              ? "Close chat"
-              : "Open chat"
-          }
+          onClick={() => {
+            if (chatOpen) {
+              setChatOpen(false);
+            } else {
+              openChat();
+            }
+          }}
         >
           <MessageCircle
             size={22}
@@ -956,25 +1075,53 @@ export default function UserDashboard() {
                 styles.header
               }
             >
-              <div>
-                <div
-                  style={
-                    styles.headerTitle
-                  }
-                >
-                  Lobby chat
-                </div>
+              <div
+                style={{
+                  display:
+                    "flex",
+                  alignItems:
+                    "center",
+                  gap: 8,
+                }}
+              >
+                {selectedUser && (
+                  <button
+                    style={
+                      styles.closeBtn
+                    }
+                    onClick={
+                      backToUsers
+                    }
+                  >
+                    <ArrowLeft
+                      size={18}
+                      color="#374151"
+                    />
+                  </button>
+                )}
 
-                <div
-                  style={
-                    socketConnected
-                      ? styles.online
-                      : styles.offline
-                  }
-                >
-                  {socketConnected
-                    ? "● Connected"
-                    : "● Connecting..."}
+                <div>
+                  <div
+                    style={
+                      styles.headerTitle
+                    }
+                  >
+                    {selectedUser
+                      ? selectedUser.name
+                      : "Private Chat"}
+                  </div>
+
+                  <div
+                    style={
+                      socketConnected
+                        ? styles.online
+                        : styles.offline
+                    }
+                  >
+                    {socketConnected
+                      ? "● Connected"
+                      : "● Connecting..."}
+                  </div>
                 </div>
               </div>
 
@@ -983,11 +1130,8 @@ export default function UserDashboard() {
                   styles.closeBtn
                 }
                 onClick={() =>
-                  setChatOpen(
-                    false,
-                  )
+                  setChatOpen(false)
                 }
-                aria-label="Close"
               >
                 <X
                   size={16}
@@ -1008,362 +1152,462 @@ export default function UserDashboard() {
               </div>
             )}
 
-            {/* MESSAGE LIST */}
+            {/* =================================================
+                USER LIST
+            ================================================= */}
 
-            <div
-              style={
-                styles.list
-              }
-              ref={listRef}
-            >
-              {chatLoading ? (
-                <p
+            {!selectedUser ? (
+              <div
+                style={
+                  styles.userList
+                }
+              >
+                <div
                   style={
-                    styles.loadingText
+                    styles.userListTitle
                   }
                 >
-                  Loading messages...
-                </p>
-              ) : messages.length ===
-                0 ? (
-                <p
-                  style={
-                    styles.loadingText
-                  }
-                >
-                  No messages yet.
-                </p>
-              ) : (
-                messages.map(
-                  (message) => {
-                    const messageId =
-                      getMessageId(
-                        message,
-                      );
+                  Select someone to chat
+                </div>
 
-                    const mine =
-                      isMyMessage(
-                        message,
-                      );
-
-                    const editing =
-                      String(
-                        editingId,
-                      ) ===
-                      String(
-                        messageId,
-                      );
-
-                    const confirmingDelete =
-                      String(
-                        pendingDeleteId,
-                      ) ===
-                      String(
-                        messageId,
-                      );
-
-                    return (
-                      <div
+                {usersLoading ? (
+                  <p
+                    style={
+                      styles.loadingText
+                    }
+                  >
+                    Loading users...
+                  </p>
+                ) : users.length ===
+                  0 ? (
+                  <p
+                    style={
+                      styles.loadingText
+                    }
+                  >
+                    No other users found.
+                  </p>
+                ) : (
+                  users.map(
+                    (chatUser) => (
+                      <button
                         key={
-                          messageId
+                          getId(
+                            chatUser
+                          )
                         }
-                        style={{
-                          ...styles.row,
-                          justifyContent:
-                            mine
-                              ? "flex-end"
-                              : "flex-start",
-                        }}
+                        style={
+                          styles.userItem
+                        }
+                        onClick={() =>
+                          selectUser(
+                            chatUser
+                          )
+                        }
                       >
                         <div
-                          style={{
-                            maxWidth:
-                              "78%",
-                          }}
+                          style={
+                            styles.avatar
+                          }
                         >
-                          {/* SENDER */}
+                          {chatUser.name
+                            ?.charAt(
+                              0
+                            )
+                            ?.toUpperCase()}
+                        </div>
 
-                          {!mine && (
-                            <div
-                              style={
-                                styles.senderName
-                              }
-                            >
-                              {getSenderName(
-                                message,
-                              )}
-                            </div>
-                          )}
-
-                          {/* MESSAGE */}
-
+                        <div
+                          style={
+                            styles.userInfo
+                          }
+                        >
                           <div
-                            style={{
-                              ...styles.bubble,
-
-                              ...(mine
-                                ? styles.bubbleMine
-                                : styles.bubbleTheirs),
-                            }}
+                            style={
+                              styles.userName
+                            }
                           >
-                            {editing ? (
-                              <div
-                                style={
-                                  styles.editRow
-                                }
-                              >
-                                <input
-                                  autoFocus
-                                  value={
-                                    editDraft
-                                  }
-                                  onChange={(
-                                    e,
-                                  ) =>
-                                    setEditDraft(
-                                      e.target
-                                        .value,
-                                    )
-                                  }
-                                  onKeyDown={(
-                                    e,
-                                  ) => {
-                                    if (
-                                      e.key ===
-                                      "Enter"
-                                    ) {
-                                      saveEdit(
-                                        messageId,
-                                      );
-                                    }
-
-                                    if (
-                                      e.key ===
-                                      "Escape"
-                                    ) {
-                                      cancelEdit();
-                                    }
-                                  }}
-                                  style={
-                                    styles.editInput
-                                  }
-                                />
-
-                                <button
-                                  style={
-                                    styles.iconBtnGhost
-                                  }
-                                  onClick={() =>
-                                    saveEdit(
-                                      messageId,
-                                    )
-                                  }
-                                >
-                                  <Check
-                                    size={
-                                      14
-                                    }
-                                    color="#16a34a"
-                                  />
-                                </button>
-
-                                <button
-                                  style={
-                                    styles.iconBtnGhost
-                                  }
-                                  onClick={
-                                    cancelEdit
-                                  }
-                                >
-                                  <X
-                                    size={
-                                      14
-                                    }
-                                    color="#dc2626"
-                                  />
-                                </button>
-                              </div>
-                            ) : (
-                              <span>
-                                {getMessageContent(
-                                  message,
-                                )}
-                              </span>
-                            )}
+                            {
+                              chatUser.name
+                            }
                           </div>
 
-                          {/* MESSAGE META */}
-
                           <div
+                            style={
+                              styles.userEmail
+                            }
+                          >
+                            {
+                              chatUser.email
+                            }
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  )
+                )}
+              </div>
+            ) : (
+              <>
+                {/* =================================================
+                    MESSAGE LIST
+                ================================================= */}
+
+                <div
+                  style={
+                    styles.list
+                  }
+                  ref={
+                    listRef
+                  }
+                >
+                  {messagesLoading ? (
+                    <p
+                      style={
+                        styles.loadingText
+                      }
+                    >
+                      Loading messages...
+                    </p>
+                  ) : messages.length ===
+                    0 ? (
+                    <div
+                      style={
+                        styles.emptyChat
+                      }
+                    >
+                      <MessageCircle
+                        size={28}
+                        color="#9ca3af"
+                      />
+
+                      <p>
+                        No messages yet.
+                      </p>
+
+                      <span>
+                        Start the
+                        conversation.
+                      </span>
+                    </div>
+                  ) : (
+                    messages.map(
+                      (message) => {
+                        const messageId =
+                          getMessageId(
+                            message
+                          );
+
+                        const mine =
+                          isMyMessage(
+                            message
+                          );
+
+                        const editing =
+                          String(
+                            editingId
+                          ) ===
+                          String(
+                            messageId
+                          );
+
+                        const confirmingDelete =
+                          String(
+                            pendingDeleteId
+                          ) ===
+                          String(
+                            messageId
+                          );
+
+                        return (
+                          <div
+                            key={
+                              messageId
+                            }
                             style={{
-                              ...styles.metaRow,
+                              ...styles.row,
                               justifyContent:
                                 mine
                                   ? "flex-end"
                                   : "flex-start",
                             }}
                           >
-                            <span
-                              style={
-                                styles.metaText
-                              }
+                            <div
+                              style={{
+                                maxWidth:
+                                  "78%",
+                              }}
                             >
-                              {formatTime(
-                                getMessageCreatedAt(
-                                  message,
-                                ),
-                              )}
-
-                              {getMessageEditedAt(
-                                message,
-                              )
-                                ? " · edited"
-                                : ""}
-                            </span>
-
-                            {/* EDIT / DELETE */}
-
-                            {mine &&
-                              !editing && (
-                                <span
+                              {!mine && (
+                                <div
                                   style={
-                                    styles.actions
+                                    styles.senderName
                                   }
                                 >
-                                  {confirmingDelete ? (
-                                    <>
-                                      <button
-                                        style={
-                                          styles.actionTextBtn
-                                        }
-                                        onClick={() =>
-                                          confirmDelete(
-                                            messageId,
-                                          )
-                                        }
-                                      >
-                                        Delete
-                                      </button>
-
-                                      <button
-                                        style={
-                                          styles.actionTextBtn
-                                        }
-                                        onClick={() =>
-                                          setPendingDeleteId(
-                                            null,
-                                          )
-                                        }
-                                      >
-                                        Keep
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <button
-                                        style={
-                                          styles.iconBtn
-                                        }
-                                        onClick={() =>
-                                          startEdit(
-                                            message,
-                                          )
-                                        }
-                                        aria-label="Edit"
-                                      >
-                                        <Pencil
-                                          size={
-                                            12
-                                          }
-                                          color="#6b7280"
-                                        />
-                                      </button>
-
-                                      <button
-                                        style={
-                                          styles.iconBtn
-                                        }
-                                        onClick={() =>
-                                          setPendingDeleteId(
-                                            messageId,
-                                          )
-                                        }
-                                        aria-label="Delete"
-                                      >
-                                        <Trash2
-                                          size={
-                                            12
-                                          }
-                                          color="#6b7280"
-                                        />
-                                      </button>
-                                    </>
+                                  {getSenderName(
+                                    message
                                   )}
-                                </span>
+                                </div>
                               )}
+
+                              <div
+                                style={{
+                                  ...styles.bubble,
+                                  ...(mine
+                                    ? styles.bubbleMine
+                                    : styles.bubbleTheirs),
+                                }}
+                              >
+                                {editing ? (
+                                  <div
+                                    style={
+                                      styles.editRow
+                                    }
+                                  >
+                                    <input
+                                      autoFocus
+                                      value={
+                                        editDraft
+                                      }
+                                      onChange={(
+                                        e
+                                      ) =>
+                                        setEditDraft(
+                                          e
+                                            .target
+                                            .value
+                                        )
+                                      }
+                                      onKeyDown={(
+                                        e
+                                      ) => {
+                                        if (
+                                          e.key ===
+                                          "Enter"
+                                        ) {
+                                          saveEdit(
+                                            messageId
+                                          );
+                                        }
+
+                                        if (
+                                          e.key ===
+                                          "Escape"
+                                        ) {
+                                          cancelEdit();
+                                        }
+                                      }}
+                                      style={
+                                        styles.editInput
+                                      }
+                                    />
+
+                                    <button
+                                      style={
+                                        styles.iconBtnGhost
+                                      }
+                                      onClick={() =>
+                                        saveEdit(
+                                          messageId
+                                        )
+                                      }
+                                    >
+                                      <Check
+                                        size={
+                                          14
+                                        }
+                                        color="#16a34a"
+                                      />
+                                    </button>
+
+                                    <button
+                                      style={
+                                        styles.iconBtnGhost
+                                      }
+                                      onClick={
+                                        cancelEdit
+                                      }
+                                    >
+                                      <X
+                                        size={
+                                          14
+                                        }
+                                        color="#dc2626"
+                                      />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span>
+                                    {getMessageContent(
+                                      message
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div
+                                style={{
+                                  ...styles.metaRow,
+                                  justifyContent:
+                                    mine
+                                      ? "flex-end"
+                                      : "flex-start",
+                                }}
+                              >
+                                <span
+                                  style={
+                                    styles.metaText
+                                  }
+                                >
+                                  {formatTime(
+                                    message.createdAt
+                                  )}
+
+                                  {message.updatedAt
+                                    ? " · edited"
+                                    : ""}
+                                </span>
+
+                                {mine &&
+                                  !editing && (
+                                    <span
+                                      style={
+                                        styles.actions
+                                      }
+                                    >
+                                      {confirmingDelete ? (
+                                        <>
+                                          <button
+                                            style={
+                                              styles.actionTextBtn
+                                            }
+                                            onClick={() =>
+                                              confirmDelete(
+                                                messageId
+                                              )
+                                            }
+                                          >
+                                            Delete
+                                          </button>
+
+                                          <button
+                                            style={
+                                              styles.actionTextBtn
+                                            }
+                                            onClick={() =>
+                                              setPendingDeleteId(
+                                                null
+                                              )
+                                            }
+                                          >
+                                            Keep
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <button
+                                            style={
+                                              styles.iconBtn
+                                            }
+                                            onClick={() =>
+                                              startEdit(
+                                                message
+                                              )
+                                            }
+                                          >
+                                            <Pencil
+                                              size={
+                                                12
+                                              }
+                                              color="#6b7280"
+                                            />
+                                          </button>
+
+                                          <button
+                                            style={
+                                              styles.iconBtn
+                                            }
+                                            onClick={() =>
+                                              setPendingDeleteId(
+                                                messageId
+                                              )
+                                            }
+                                          >
+                                            <Trash2
+                                              size={
+                                                12
+                                              }
+                                              color="#6b7280"
+                                            />
+                                          </button>
+                                        </>
+                                      )}
+                                    </span>
+                                  )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  },
-                )
-              )}
-            </div>
+                        );
+                      }
+                    )
+                  )}
+                </div>
 
-            {/* INPUT */}
+                {/* =================================================
+                    MESSAGE INPUT
+                ================================================= */}
 
-            <div
-              style={
-                styles.inputRow
-              }
-            >
-              <input
-                value={draft}
-                onChange={(e) =>
-                  setDraft(
-                    e.target.value,
-                  )
-                }
-                onKeyDown={(e) => {
-                  if (
-                    e.key ===
-                      "Enter" &&
-                    !e.shiftKey
-                  ) {
-                    e.preventDefault();
-
-                    sendMessage();
+                <div
+                  style={
+                    styles.inputRow
                   }
-                }}
-                placeholder="Message the lobby..."
-                style={
-                  styles.input
-                }
-              />
+                >
+                  <input
+                    value={draft}
+                    onChange={(e) =>
+                      setDraft(
+                        e.target.value
+                      )
+                    }
+                    onKeyDown={(e) => {
+                      if (
+                        e.key ===
+                          "Enter" &&
+                        !e.shiftKey
+                      ) {
+                        e.preventDefault();
+                        sendMessage();
+                      }
+                    }}
+                    placeholder={`Message ${selectedUser.name}...`}
+                    style={
+                      styles.input
+                    }
+                  />
 
-              <button
-                style={{
-                  ...styles.sendBtn,
-
-                  opacity:
-                    sending
-                      ? 0.6
-                      : 1,
-                }}
-                onClick={
-                  sendMessage
-                }
-                disabled={
-                  sending
-                }
-                aria-label="Send"
-              >
-                <Send
-                  size={16}
-                  color="#ffffff"
-                />
-              </button>
-            </div>
+                  <button
+                    style={{
+                      ...styles.sendBtn,
+                      opacity:
+                        sending
+                          ? 0.6
+                          : 1,
+                    }}
+                    onClick={
+                      sendMessage
+                    }
+                    disabled={
+                      sending
+                    }
+                  >
+                    <Send
+                      size={16}
+                      color="#ffffff"
+                    />
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -1392,8 +1636,7 @@ const styles = {
     width: 48,
     height: 48,
     borderRadius: "50%",
-    border:
-      "1px solid #e2e5ea",
+    border: "1px solid #e2e5ea",
     background: "#2563eb",
     display: "flex",
     alignItems: "center",
@@ -1405,11 +1648,10 @@ const styles = {
 
   panel: {
     marginTop: 12,
-    width: 340,
-    height: 460,
+    width: 350,
+    height: 500,
     background: "#ffffff",
-    border:
-      "1px solid #e2e5ea",
+    border: "1px solid #e2e5ea",
     borderRadius: 14,
     display: "flex",
     flexDirection: "column",
@@ -1420,8 +1662,7 @@ const styles = {
 
   header: {
     display: "flex",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
     alignItems: "center",
     padding: "14px 16px",
     borderBottom:
@@ -1448,35 +1689,91 @@ const styles = {
   },
 
   closeBtn: {
-    background:
-      "transparent",
+    background: "transparent",
     border: "none",
     cursor: "pointer",
     padding: 4,
+    display: "flex",
+    alignItems: "center",
   },
 
   chatError: {
-    padding:
-      "8px 12px",
-    background:
-      "#fef2f2",
+    padding: "8px 12px",
+    background: "#fef2f2",
     color: "#dc2626",
     fontSize: 12,
     borderBottom:
       "1px solid #fee2e2",
   },
 
+  userList: {
+    flex: 1,
+    overflowY: "auto",
+    padding: 12,
+  },
+
+  userListTitle: {
+    color: "#6b7280",
+    fontSize: 12,
+    fontWeight: 600,
+    marginBottom: 8,
+    padding: "4px",
+  },
+
+  userItem: {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "10px 8px",
+    border: "none",
+    borderRadius: 10,
+    background: "#ffffff",
+    cursor: "pointer",
+    textAlign: "left",
+  },
+
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: "50%",
+    background: "#dbeafe",
+    color: "#2563eb",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 600,
+    fontSize: 14,
+    flexShrink: 0,
+  },
+
+  userInfo: {
+    minWidth: 0,
+  },
+
+  userName: {
+    color: "#111827",
+    fontSize: 13,
+    fontWeight: 600,
+  },
+
+  userEmail: {
+    color: "#9ca3af",
+    fontSize: 11,
+    marginTop: 2,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+
   list: {
     flex: 1,
     overflowY: "auto",
-    padding:
-      "14px 12px",
+    padding: "14px 12px",
     display: "flex",
-    flexDirection:
-      "column",
+    flexDirection: "column",
     gap: 12,
-    background:
-      "#ffffff",
+    background: "#ffffff",
   },
 
   loadingText: {
@@ -1484,6 +1781,13 @@ const styles = {
     color: "#9ca3af",
     fontSize: 12,
     marginTop: 20,
+  },
+
+  emptyChat: {
+    margin: "auto",
+    textAlign: "center",
+    color: "#9ca3af",
+    fontSize: 12,
   },
 
   row: {
@@ -1499,28 +1803,23 @@ const styles = {
   },
 
   bubble: {
-    padding:
-      "8px 12px",
+    padding: "8px 12px",
     borderRadius: 14,
     fontSize: 13.5,
     lineHeight: 1.4,
-    wordBreak:
-      "break-word",
+    wordBreak: "break-word",
   },
 
   bubbleMine: {
-    background:
-      "#2563eb",
+    background: "#2563eb",
     color: "#ffffff",
     borderBottomRightRadius: 4,
   },
 
   bubbleTheirs: {
-    background:
-      "#f1f3f5",
+    background: "#f1f3f5",
     color: "#111827",
-    border:
-      "1px solid #e5e7eb",
+    border: "1px solid #e5e7eb",
     borderBottomLeftRadius: 4,
   },
 
@@ -1544,8 +1843,7 @@ const styles = {
   },
 
   iconBtn: {
-    background:
-      "transparent",
+    background: "transparent",
     border: "none",
     cursor: "pointer",
     padding: 2,
@@ -1554,8 +1852,7 @@ const styles = {
   },
 
   iconBtnGhost: {
-    background:
-      "transparent",
+    background: "transparent",
     border: "none",
     cursor: "pointer",
     padding: 2,
@@ -1564,15 +1861,13 @@ const styles = {
   },
 
   actionTextBtn: {
-    background:
-      "transparent",
+    background: "transparent",
     border: "none",
     color: "#dc2626",
     fontSize: 10.5,
     cursor: "pointer",
     padding: 0,
-    textDecoration:
-      "underline",
+    textDecoration: "underline",
   },
 
   editRow: {
@@ -1582,15 +1877,12 @@ const styles = {
   },
 
   editInput: {
-    background:
-      "#ffffff",
-    border:
-      "1px solid #d1d5db",
+    background: "#ffffff",
+    border: "1px solid #d1d5db",
     borderRadius: 8,
     color: "#111827",
     fontSize: 13,
-    padding:
-      "4px 8px",
+    padding: "4px 8px",
     outline: "none",
     minWidth: 120,
   },
@@ -1601,19 +1893,15 @@ const styles = {
     padding: 12,
     borderTop:
       "1px solid #eef0f3",
-    background:
-      "#fafbfc",
+    background: "#fafbfc",
   },
 
   input: {
     flex: 1,
-    background:
-      "#ffffff",
-    border:
-      "1px solid #d1d5db",
+    background: "#ffffff",
+    border: "1px solid #d1d5db",
     borderRadius: 20,
-    padding:
-      "9px 14px",
+    padding: "9px 14px",
     color: "#111827",
     fontSize: 13,
     outline: "none",
@@ -1624,12 +1912,10 @@ const styles = {
     height: 36,
     borderRadius: "50%",
     border: "none",
-    background:
-      "#2563eb",
+    background: "#2563eb",
     display: "flex",
     alignItems: "center",
-    justifyContent:
-      "center",
+    justifyContent: "center",
     cursor: "pointer",
   },
 };

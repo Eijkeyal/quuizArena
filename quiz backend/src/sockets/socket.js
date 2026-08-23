@@ -1,7 +1,9 @@
 import { verifyToken } from "../utils/jwt.js";
 
 const initSocket = (io) => {
-  // Authenticate socket using JWT
+  // ============================================================
+  // SOCKET AUTHENTICATION
+  // ============================================================
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token;
 
@@ -21,23 +23,75 @@ const initSocket = (io) => {
     }
   });
 
+  // ============================================================
+  // CONNECTION
+  // ============================================================
   io.on("connection", (socket) => {
     console.log(`Socket connected: ${socket.id} (user ${socket.userId})`);
 
-    // Join a quiz room
+    // ==========================================================
+    // PRIVATE CHAT
+    // ==========================================================
+
+    // Join private conversation
+    socket.on("joinConversation", (conversationId) => {
+      if (!conversationId) {
+        return;
+      }
+
+      const room = `conversation:${conversationId}`;
+
+      socket.join(room);
+
+      console.log(`User ${socket.userId} joined ${room}`);
+    });
+
+    // Leave private conversation
+    socket.on("leaveConversation", (conversationId) => {
+      if (!conversationId) {
+        return;
+      }
+
+      const room = `conversation:${conversationId}`;
+
+      socket.leave(room);
+
+      console.log(`User ${socket.userId} left ${room}`);
+    });
+
+    // ==========================================================
+    // QUIZ CHAT
+    // ==========================================================
+
+    // Join quiz lobby
     socket.on("joinQuiz", (quizId) => {
-      socket.join(`quiz:${quizId}`);
+      if (!quizId) {
+        return;
+      }
 
-      console.log(`User ${socket.userId} joined quiz:${quizId}`);
+      const room = `quiz:${quizId}`;
+
+      socket.join(room);
+
+      console.log(`User ${socket.userId} joined ${room}`);
     });
 
-    // Leave a quiz room
+    // Leave quiz lobby
     socket.on("leaveQuiz", (quizId) => {
-      socket.leave(`quiz:${quizId}`);
+      if (!quizId) {
+        return;
+      }
 
-      console.log(`User ${socket.userId} left quiz:${quizId}`);
+      const room = `quiz:${quizId}`;
+
+      socket.leave(room);
+
+      console.log(`User ${socket.userId} left ${room}`);
     });
 
+    // ==========================================================
+    // DISCONNECT
+    // ==========================================================
     socket.on("disconnect", () => {
       console.log(`Socket disconnected: ${socket.id}`);
     });

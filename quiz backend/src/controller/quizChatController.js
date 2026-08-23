@@ -1,4 +1,4 @@
-import Message from "../models/message.js";
+import Message from "../models/privateMessage.js";
 import Quiz from "../models/quiz.js";
 import QuizParticipant from "../models/quizParticipant.js";
 

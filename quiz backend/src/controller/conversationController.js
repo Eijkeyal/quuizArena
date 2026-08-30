@@ -1,6 +1,7 @@
+import mongoose from "mongoose";
 import Conversation from "../models/Conversation.js";
+import User from "../models/user.js";
 
-//create conversations
 export const createConversation = async (req, res) => {
   try {
     const { userId } = req.body;
@@ -12,13 +13,30 @@ export const createConversation = async (req, res) => {
       });
     }
 
-    if (userId === myId) {
+    // Validate MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        message: "Invalid user ID",
+      });
+    }
+
+    // Cannot chat with yourself
+    if (userId.toString() === myId.toString()) {
       return res.status(400).json({
         message: "Cannot start a conversation with yourself",
       });
     }
 
-    // Check if a conversation already exists between these two users
+    // Check whether target user exists
+    const otherUser = await User.findById(userId);
+
+    if (!otherUser) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    // Check if conversation already exists
     let conversation = await Conversation.findOne({
       $or: [
         {
@@ -32,6 +50,7 @@ export const createConversation = async (req, res) => {
       ],
     });
 
+    // Create only if it doesn't exist
     if (!conversation) {
       conversation = await Conversation.create({
         user1Id: myId,
@@ -39,13 +58,20 @@ export const createConversation = async (req, res) => {
       });
     }
 
-    res.status(201).json(conversation);
+    // Return populated users
+    conversation = await Conversation.findById(conversation._id)
+      .populate("user1Id", "name email role")
+      .populate("user2Id", "name email role");
+
+    res.status(200).json(conversation);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Create conversation error:", error);
+
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
-
-// get conversations
 export const getConversations = async (req, res) => {
   try {
     const myId = req.userId;
@@ -53,34 +79,43 @@ export const getConversations = async (req, res) => {
     const conversations = await Conversation.find({
       $or: [{ user1Id: myId }, { user2Id: myId }],
     })
-      .populate("user1Id", "name email")
-      .populate("user2Id", "name email")
+      .populate("user1Id", "name email role")
+      .populate("user2Id", "name email role")
       .sort({ updatedAt: -1 });
 
-    res.json(conversations);
+    res.status(200).json(conversations);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Get conversations error:", error);
+
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-// get conversations
 export const getConversationById = async (req, res) => {
   try {
-    const conversation = await Conversation.findById(req.params.id)
-      .populate("user1Id", "name email")
-      .populate("user2Id", "name email");
+    const { conversationId } = req.params;
+    const myId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({
+        message: "Invalid conversation ID",
+      });
+    }
+
+    const conversation = await Conversation.findById(conversationId)
+      .populate("user1Id", "name email role")
+      .populate("user2Id", "name email role");
 
     if (!conversation) {
       return res.status(404).json({
         message: "Conversation not found",
       });
     }
-
-    const myId = req.userId;
-
     const isParticipant =
-      conversation.user1Id._id.toString() === myId ||
-      conversation.user2Id._id.toString() === myId;
+      conversation.user1Id._id.toString() === myId.toString() ||
+      conversation.user2Id._id.toString() === myId.toString();
 
     if (!isParticipant) {
       return res.status(403).json({
@@ -88,16 +123,28 @@ export const getConversationById = async (req, res) => {
       });
     }
 
-    res.json(conversation);
+    res.status(200).json(conversation);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Get conversation error:", error);
+
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-// Delete conversations
 export const deleteConversation = async (req, res) => {
   try {
-    const conversation = await Conversation.findById(req.params.id);
+    const { conversationId } = req.params;
+    const myId = req.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({
+        message: "Invalid conversation ID",
+      });
+    }
+
+    const conversation = await Conversation.findById(conversationId);
 
     if (!conversation) {
       return res.status(404).json({
@@ -105,11 +152,10 @@ export const deleteConversation = async (req, res) => {
       });
     }
 
-    const myId = req.userId;
-
+    // Make sure logged-in user belongs to conversation
     const isParticipant =
-      conversation.user1Id.toString() === myId ||
-      conversation.user2Id.toString() === myId;
+      conversation.user1Id.toString() === myId.toString() ||
+      conversation.user2Id.toString() === myId.toString();
 
     if (!isParticipant) {
       return res.status(403).json({
@@ -119,10 +165,14 @@ export const deleteConversation = async (req, res) => {
 
     await conversation.deleteOne();
 
-    res.json({
+    res.status(200).json({
       message: "Conversation deleted",
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Delete conversation error:", error);
+
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };

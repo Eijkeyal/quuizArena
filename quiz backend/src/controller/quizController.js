@@ -4,9 +4,6 @@ import QuizParticipant from "../models/quizParticipant.js";
 import Answer from "../models/answer.js";
 import { startQuizTimer } from "../services/quizTimerService.js";
 
-// ==========================================
-// CREATE QUIZ
-// ==========================================
 export const createQuiz = async (req, res) => {
   try {
     const { title, description } = req.body;
@@ -31,9 +28,6 @@ export const createQuiz = async (req, res) => {
   }
 };
 
-// ==========================================
-// GET ALL QUIZZES
-// ==========================================
 export const getQuizzes = async (req, res) => {
   try {
     const quizzes = await Quiz.find()
@@ -47,10 +41,6 @@ export const getQuizzes = async (req, res) => {
     });
   }
 };
-
-// ==========================================
-// GET QUIZ BY ID
-// ==========================================
 export const getQuizById = async (req, res) => {
   try {
     const quiz = await Quiz.findById(req.params.id).populate(
@@ -72,10 +62,6 @@ export const getQuizById = async (req, res) => {
   }
 };
 
-// ==========================================
-// UPDATE QUIZ
-// DRAFT + COMPLETED ONLY
-// ==========================================
 export const updateQuiz = async (req, res) => {
   try {
     const { title, description } = req.body;
@@ -88,8 +74,6 @@ export const updateQuiz = async (req, res) => {
       });
     }
 
-    // Allow editing only before the quiz starts
-    // or after the previous session has completed.
     if (quiz.status !== "DRAFT" && quiz.status !== "COMPLETED") {
       return res.status(400).json({
         message: "Quiz cannot be edited while it is READY or LIVE",
@@ -123,10 +107,6 @@ export const updateQuiz = async (req, res) => {
   }
 };
 
-// ==========================================
-// DELETE QUIZ
-// Cannot delete while LIVE
-// ==========================================
 export const deleteQuiz = async (req, res) => {
   try {
     const quiz = await Quiz.findById(req.params.id);
@@ -145,22 +125,15 @@ export const deleteQuiz = async (req, res) => {
 
     const quizId = quiz._id;
 
-    // Delete related questions
     await Question.deleteMany({
       quizId,
     });
-
-    // Delete related participants
     await QuizParticipant.deleteMany({
       quizId,
     });
-
-    // Delete related answers
     await Answer.deleteMany({
       quizId,
     });
-
-    // Delete quiz
     await quiz.deleteOne();
 
     return res.status(200).json({
@@ -173,10 +146,6 @@ export const deleteQuiz = async (req, res) => {
   }
 };
 
-// ==========================================
-// MARK QUIZ AS READY
-// DRAFT → READY
-// ==========================================
 export const readyQuiz = async (req, res) => {
   try {
     const { quizId } = req.params;
@@ -223,10 +192,6 @@ export const readyQuiz = async (req, res) => {
   }
 };
 
-// ==========================================
-// START QUIZ
-// READY → LIVE
-// ==========================================
 export const startQuiz = async (req, res) => {
   try {
     const { quizId } = req.params;
@@ -298,10 +263,6 @@ export const startQuiz = async (req, res) => {
   }
 };
 
-// ==========================================
-// RESTART QUIZ
-// COMPLETED → READY
-// ==========================================
 export const restartQuiz = async (req, res) => {
   try {
     const { quizId } = req.params;
@@ -314,7 +275,6 @@ export const restartQuiz = async (req, res) => {
       });
     }
 
-    // Only COMPLETED quizzes can restart
     if (quiz.status !== "COMPLETED") {
       return res.status(400).json({
         message: `Only a completed quiz can be restarted. Current status: ${quiz.status}`,
@@ -332,25 +292,12 @@ export const restartQuiz = async (req, res) => {
       });
     }
 
-    // ==========================================
-    // CLEAR OLD QUIZ SESSION DATA
-    // ==========================================
-
-    // Remove old participants
     await QuizParticipant.deleteMany({
       quizId,
     });
-
-    // Remove old answers
     await Answer.deleteMany({
       quizId,
     });
-
-    // ==========================================
-    // RESET QUIZ
-    // COMPLETED → READY
-    // ==========================================
-
     quiz.status = "READY";
     quiz.currentQuestionIndex = 0;
     quiz.startedAt = null;

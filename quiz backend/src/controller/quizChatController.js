@@ -1,8 +1,7 @@
-import Message from "../models/message.js";
+import Message from "../models/privateMessage.js";
 import Quiz from "../models/quiz.js";
 import QuizParticipant from "../models/quizParticipant.js";
 
-// SEND QUIZ CHAT MESSAGE
 export const sendQuizMessage = async (req, res) => {
   try {
     const { quizId } = req.params;
@@ -54,7 +53,6 @@ export const sendQuizMessage = async (req, res) => {
   }
 };
 
-// GET QUIZ CHAT MESSAGES
 export const getQuizMessages = async (req, res) => {
   try {
     const { quizId } = req.params;

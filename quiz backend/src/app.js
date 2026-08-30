@@ -25,38 +25,27 @@ app.use(
 
 app.use(express.json());
 
-// Authentication
 app.use("/auth", authRoutes);
 
-// Users
 app.use("/users", userRoutes);
 
-// One-to-one conversations
 app.use("/conversations", conversationRoutes);
 
-// Messages
 app.use("/conversations/:conversationId/messages", messageRoutes);
 app.use("/messages", messageRoutes);
 
-// Quiz management
 app.use("/quizzes", quizRoutes);
 
-// Questions
 app.use("/", questionRoutes);
 
-// Quiz participants
 app.use("/quizzes", quizParticipantRoutes);
 
-// Quiz chat
 app.use("/quizzes", quizChatRoutes);
 
-// Quiz answers
 app.use("/quizzes", answerRoutes);
 
-// Quiz results + leaderboard
 app.use("/quizzes", resultRoutes);
 
-// Error middleware must always be last
 app.use(errorMiddleware);
 
 export default app;

@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
+
 import http from "http";
 import { Server } from "socket.io";
 
@@ -13,17 +14,14 @@ const start = async () => {
   try {
     await connectDB();
 
-    // Create the HTTP server usng node
     const httpServer = http.createServer(app);
 
-    // Add Socket.IO to the HTTP server
     const io = new Server(httpServer, {
       cors: {
         origin: "*",
       },
     });
 
-    // Make io available in Express controllers
     app.set("io", io);
 
     initSocket(io);

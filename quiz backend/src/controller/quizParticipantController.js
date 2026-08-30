@@ -1,9 +1,6 @@
 import Quiz from "../models/quiz.js";
 import QuizParticipant from "../models/quizParticipant.js";
 
-// ==========================================
-// JOIN QUIZ
-// ==========================================
 export const joinQuiz = async (req, res) => {
   try {
     const { quizId } = req.params;
@@ -14,14 +11,12 @@ export const joinQuiz = async (req, res) => {
     console.log("userId from token:", userId);
     console.log("================================\n");
 
-    // 1. Validate user
     if (!userId) {
       return res.status(401).json({
         message: "User ID not found in authentication token",
       });
     }
 
-    // 2. Check whether quiz exists
     const quiz = await Quiz.findById(quizId);
 
     if (!quiz) {
@@ -33,14 +28,12 @@ export const joinQuiz = async (req, res) => {
     console.log("Quiz found:", quiz._id.toString());
     console.log("Quiz status:", quiz.status);
 
-    // 3. Prevent joining completed quiz
     if (quiz.status === "COMPLETED") {
       return res.status(400).json({
         message: "This quiz has already ended",
       });
     }
 
-    // 4. Check if participant already exists
     const existingParticipant = await QuizParticipant.findOne({
       quizId,
       userId,
@@ -58,7 +51,6 @@ export const joinQuiz = async (req, res) => {
         : null,
     );
 
-    // 5. Already joined
     if (existingParticipant) {
       console.log("User already joined.");
 
@@ -69,7 +61,6 @@ export const joinQuiz = async (req, res) => {
       });
     }
 
-    // 6. Create participant
     const participant = await QuizParticipant.create({
       quizId,
       userId,
@@ -83,7 +74,6 @@ export const joinQuiz = async (req, res) => {
     console.log("saved userId:", participant.userId.toString());
     console.log("score:", participant.score);
 
-    // 7. Verify it was actually saved
     const verifyParticipant = await QuizParticipant.findOne({
       quizId,
       userId,

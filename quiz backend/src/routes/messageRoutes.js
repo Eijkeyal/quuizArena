@@ -9,21 +9,21 @@ import {
 
 import authMiddleware from "../middleware/authMiddleware.js";
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true });
 
-// Create a message in a conversation
+// ============================================================
+// PRIVATE MESSAGES
+// ============================================================
+
 // POST /conversations/:conversationId/messages
 router.post("/", authMiddleware, createMessage);
 
-// Get messages from a conversation
 // GET /conversations/:conversationId/messages?page=1&limit=10
 router.get("/", authMiddleware, getMessages);
 
-// Update a message
 // PUT /messages/:id
 router.put("/:id", authMiddleware, updateMessage);
 
-// Delete a message
 // DELETE /messages/:id
 router.delete("/:id", authMiddleware, deleteMessage);
 

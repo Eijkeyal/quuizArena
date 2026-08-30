@@ -1,7 +1,6 @@
 import { verifyToken } from "../utils/jwt.js";
 
 const initSocket = (io) => {
-  // Authenticate socket using JWT
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token;
 
@@ -24,18 +23,52 @@ const initSocket = (io) => {
   io.on("connection", (socket) => {
     console.log(`Socket connected: ${socket.id} (user ${socket.userId})`);
 
-    // Join a quiz room
-    socket.on("joinQuiz", (quizId) => {
-      socket.join(`quiz:${quizId}`);
+    socket.on("joinConversation", (conversationId) => {
+      if (!conversationId) {
+        return;
+      }
 
-      console.log(`User ${socket.userId} joined quiz:${quizId}`);
+      const room = `conversation:${conversationId}`;
+
+      socket.join(room);
+
+      console.log(`User ${socket.userId} joined ${room}`);
     });
 
-    // Leave a quiz room
-    socket.on("leaveQuiz", (quizId) => {
-      socket.leave(`quiz:${quizId}`);
+    socket.on("leaveConversation", (conversationId) => {
+      if (!conversationId) {
+        return;
+      }
 
-      console.log(`User ${socket.userId} left quiz:${quizId}`);
+      const room = `conversation:${conversationId}`;
+
+      socket.leave(room);
+
+      console.log(`User ${socket.userId} left ${room}`);
+    });
+
+    socket.on("joinQuiz", (quizId) => {
+      if (!quizId) {
+        return;
+      }
+
+      const room = `quiz:${quizId}`;
+
+      socket.join(room);
+
+      console.log(`User ${socket.userId} joined ${room}`);
+    });
+
+    socket.on("leaveQuiz", (quizId) => {
+      if (!quizId) {
+        return;
+      }
+
+      const room = `quiz:${quizId}`;
+
+      socket.leave(room);
+
+      console.log(`User ${socket.userId} left ${room}`);
     });
 
     socket.on("disconnect", () => {

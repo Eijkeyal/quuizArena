@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const messageSchema = new mongoose.Schema(
+const quizMessageSchema = new mongoose.Schema(
   {
     quizId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -30,8 +30,8 @@ const messageSchema = new mongoose.Schema(
   },
 );
 
-messageSchema.index({ quizId: 1, createdAt: 1 });
+quizMessageSchema.index({ quizId: 1, createdAt: 1 });
 
-const Message = mongoose.model("Message", messageSchema);
+const QuizMessage = mongoose.model("QuizMessage", quizMessageSchema);
 
-export default Message;
+export default QuizMessage;

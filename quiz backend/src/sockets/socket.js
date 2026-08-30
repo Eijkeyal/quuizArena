@@ -1,9 +1,6 @@
 import { verifyToken } from "../utils/jwt.js";
 
 const initSocket = (io) => {
-  // ============================================================
-  // SOCKET AUTHENTICATION
-  // ============================================================
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token;
 
@@ -23,17 +20,9 @@ const initSocket = (io) => {
     }
   });
 
-  // ============================================================
-  // CONNECTION
-  // ============================================================
   io.on("connection", (socket) => {
     console.log(`Socket connected: ${socket.id} (user ${socket.userId})`);
 
-    // ==========================================================
-    // PRIVATE CHAT
-    // ==========================================================
-
-    // Join private conversation
     socket.on("joinConversation", (conversationId) => {
       if (!conversationId) {
         return;
@@ -46,7 +35,6 @@ const initSocket = (io) => {
       console.log(`User ${socket.userId} joined ${room}`);
     });
 
-    // Leave private conversation
     socket.on("leaveConversation", (conversationId) => {
       if (!conversationId) {
         return;
@@ -59,11 +47,6 @@ const initSocket = (io) => {
       console.log(`User ${socket.userId} left ${room}`);
     });
 
-    // ==========================================================
-    // QUIZ CHAT
-    // ==========================================================
-
-    // Join quiz lobby
     socket.on("joinQuiz", (quizId) => {
       if (!quizId) {
         return;
@@ -76,7 +59,6 @@ const initSocket = (io) => {
       console.log(`User ${socket.userId} joined ${room}`);
     });
 
-    // Leave quiz lobby
     socket.on("leaveQuiz", (quizId) => {
       if (!quizId) {
         return;
@@ -89,9 +71,6 @@ const initSocket = (io) => {
       console.log(`User ${socket.userId} left ${room}`);
     });
 
-    // ==========================================================
-    // DISCONNECT
-    // ==========================================================
     socket.on("disconnect", () => {
       console.log(`Socket disconnected: ${socket.id}`);
     });

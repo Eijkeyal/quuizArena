@@ -2,10 +2,6 @@ import mongoose from "mongoose";
 import Conversation from "../models/Conversation.js";
 import User from "../models/user.js";
 
-// ============================================================
-// CREATE / GET EXISTING CONVERSATION
-// POST /conversations
-// ============================================================
 export const createConversation = async (req, res) => {
   try {
     const { userId } = req.body;
@@ -76,11 +72,6 @@ export const createConversation = async (req, res) => {
     });
   }
 };
-
-// ============================================================
-// GET ALL MY CONVERSATIONS
-// GET /conversations
-// ============================================================
 export const getConversations = async (req, res) => {
   try {
     const myId = req.userId;
@@ -102,10 +93,6 @@ export const getConversations = async (req, res) => {
   }
 };
 
-// ============================================================
-// GET ONE CONVERSATION
-// GET /conversations/:conversationId
-// ============================================================
 export const getConversationById = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -126,8 +113,6 @@ export const getConversationById = async (req, res) => {
         message: "Conversation not found",
       });
     }
-
-    // Make sure logged-in user belongs to conversation
     const isParticipant =
       conversation.user1Id._id.toString() === myId.toString() ||
       conversation.user2Id._id.toString() === myId.toString();
@@ -148,10 +133,6 @@ export const getConversationById = async (req, res) => {
   }
 };
 
-// ============================================================
-// DELETE CONVERSATION
-// DELETE /conversations/:conversationId
-// ============================================================
 export const deleteConversation = async (req, res) => {
   try {
     const { conversationId } = req.params;

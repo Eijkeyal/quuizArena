@@ -5,8 +5,6 @@ import Answer from "../models/answer.js";
 export const getLeaderboard = async (req, res) => {
   try {
     const { quizId } = req.params;
-
-    // 1. Check quiz exists
     const quiz = await Quiz.findById(quizId);
 
     if (!quiz) {
@@ -14,8 +12,6 @@ export const getLeaderboard = async (req, res) => {
         message: "Quiz not found",
       });
     }
-
-    // 2. Get participants sorted by highest score
     const participants = await QuizParticipant.find({ quizId })
       .populate("userId", "name email")
       .sort({
@@ -23,7 +19,7 @@ export const getLeaderboard = async (req, res) => {
         updatedAt: 1,
       });
 
-    // 3. Calculate correct answers and points for each participant
+    //Calculate correct answers and points for each participant
     const leaderboard = await Promise.all(
       participants.map(async (participant, index) => {
         const answers = await Answer.find({
@@ -56,8 +52,6 @@ export const getLeaderboard = async (req, res) => {
           correctAnswers,
           wrongAnswers,
           totalPoints,
-
-          // Keep score for compatibility
           score: participant.score,
 
           status: participant.status,
@@ -65,7 +59,6 @@ export const getLeaderboard = async (req, res) => {
       }),
     );
 
-    // 4. Return leaderboard
     return res.status(200).json({
       quiz: {
         _id: quiz._id,

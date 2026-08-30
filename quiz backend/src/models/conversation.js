@@ -18,7 +18,6 @@ const conversationSchema = new mongoose.Schema(
   },
 );
 
-// Prevent duplicate conversations between the same two users
 conversationSchema.index({ user1Id: 1, user2Id: 1 }, { unique: true });
 
 const Conversation = mongoose.model("Conversation", conversationSchema);

@@ -1,11 +1,6 @@
 import mongoose from "mongoose";
 import User from "../models/user.js";
 
-// ============================================================
-// GET USERS FOR PRIVATE CHAT
-// GET /users
-// Returns every user except the currently logged-in user.
-// ============================================================
 export const getAllUsers = async (req, res) => {
   try {
     const users = await User.find({
@@ -22,10 +17,6 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
-// ============================================================
-// GET SINGLE USER
-// GET /users/:id
-// ============================================================
 export const getUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -54,10 +45,6 @@ export const getUser = async (req, res) => {
   }
 };
 
-// ============================================================
-// UPDATE OWN USER
-// PUT /users/:id
-// ============================================================
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -68,7 +55,6 @@ export const updateUser = async (req, res) => {
       });
     }
 
-    // Users can only update their own account.
     if (id.toString() !== req.userId.toString()) {
       return res.status(403).json({
         message: "You can only update your own account",
@@ -108,10 +94,6 @@ export const updateUser = async (req, res) => {
   }
 };
 
-// ============================================================
-// DELETE OWN USER
-// DELETE /users/:id
-// ============================================================
 export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -122,7 +104,6 @@ export const deleteUser = async (req, res) => {
       });
     }
 
-    // Users can only delete their own account.
     if (id.toString() !== req.userId.toString()) {
       return res.status(403).json({
         message: "You can only delete your own account",

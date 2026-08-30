@@ -2,10 +2,6 @@ import mongoose from "mongoose";
 import PrivateMessage from "../models/privateMessage.js";
 import Conversation from "../models/Conversation.js";
 
-// ============================================================
-// CREATE PRIVATE MESSAGE
-// POST /conversations/:conversationId/messages
-// ============================================================
 export const createMessage = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -25,8 +21,6 @@ export const createMessage = async (req, res) => {
         message: "Content is required",
       });
     }
-
-    // Find conversation
     const conversation = await Conversation.findById(conversationId);
 
     if (!conversation) {
@@ -34,8 +28,6 @@ export const createMessage = async (req, res) => {
         message: "Conversation not found",
       });
     }
-
-    // Check participant
     const isParticipant =
       conversation.user1Id.toString() === senderId.toString() ||
       conversation.user2Id.toString() === senderId.toString();
@@ -52,8 +44,6 @@ export const createMessage = async (req, res) => {
       senderId,
       content: content.trim(),
     });
-
-    // Populate sender information
     message = await message.populate("senderId", "name email");
 
     // Update conversation activity
@@ -77,11 +67,6 @@ export const createMessage = async (req, res) => {
     });
   }
 };
-
-// ============================================================
-// GET PRIVATE MESSAGES
-// GET /conversations/:conversationId/messages
-// ============================================================
 export const getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -111,7 +96,6 @@ export const getMessages = async (req, res) => {
 
     const myId = req.userId;
 
-    // Check participant
     const isParticipant =
       conversation.user1Id.toString() === myId.toString() ||
       conversation.user2Id.toString() === myId.toString();
@@ -130,8 +114,6 @@ export const getMessages = async (req, res) => {
       .skip((page - 1) * limit)
       .limit(limit)
       .populate("senderId", "name email");
-
-    // Return oldest → newest
     messages.reverse();
 
     return res.status(200).json(messages);
@@ -144,10 +126,6 @@ export const getMessages = async (req, res) => {
   }
 };
 
-// ============================================================
-// UPDATE PRIVATE MESSAGE
-// PATCH /messages/:id
-// ============================================================
 export const updateMessage = async (req, res) => {
   try {
     const { content } = req.body;
@@ -171,8 +149,6 @@ export const updateMessage = async (req, res) => {
         message: "Message not found",
       });
     }
-
-    // Only sender can edit
     if (message.senderId.toString() !== req.userId.toString()) {
       return res.status(403).json({
         message: "You can only edit your own messages",
@@ -205,10 +181,6 @@ export const updateMessage = async (req, res) => {
   }
 };
 
-// ============================================================
-// DELETE PRIVATE MESSAGE
-// DELETE /messages/:id
-// ============================================================
 export const deleteMessage = async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -225,7 +197,6 @@ export const deleteMessage = async (req, res) => {
       });
     }
 
-    // Only sender can delete
     if (message.senderId.toString() !== req.userId.toString()) {
       return res.status(403).json({
         message: "You can only delete your own messages",
@@ -236,8 +207,6 @@ export const deleteMessage = async (req, res) => {
     const messageId = message._id.toString();
 
     await message.deleteOne();
-
-    // Broadcast deletion
     const io = req.app.get("io");
 
     if (io) {

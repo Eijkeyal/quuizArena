@@ -1,9 +1,5 @@
 import Question from "../models/question.js";
 import Quiz from "../models/quiz.js";
-
-// ==========================================
-// CREATE QUESTION
-// ==========================================
 export const createQuestion = async (req, res) => {
   try {
     const { quizId } = req.params;
@@ -17,9 +13,6 @@ export const createQuestion = async (req, res) => {
         message: "Quiz not found",
       });
     }
-
-    // Only block editing while quiz is LIVE
-    // DRAFT and COMPLETED quizzes can be edited
     if (quiz.status === "LIVE") {
       return res.status(400).json({
         message: "Cannot add questions while the quiz is live",
@@ -58,9 +51,6 @@ export const createQuestion = async (req, res) => {
   }
 };
 
-// ==========================================
-// GET QUESTIONS FOR A QUIZ
-// ==========================================
 export const getQuestions = async (req, res) => {
   try {
     const { quizId } = req.params;
@@ -77,9 +67,6 @@ export const getQuestions = async (req, res) => {
   }
 };
 
-// ==========================================
-// GET QUESTION BY ID
-// ==========================================
 export const getQuestionById = async (req, res) => {
   try {
     const question = await Question.findById(req.params.id);
@@ -98,9 +85,6 @@ export const getQuestionById = async (req, res) => {
   }
 };
 
-// ==========================================
-// UPDATE QUESTION
-// ==========================================
 export const updateQuestion = async (req, res) => {
   try {
     const question = await Question.findById(req.params.id);
@@ -119,9 +103,6 @@ export const updateQuestion = async (req, res) => {
         message: "Quiz not found",
       });
     }
-
-    // Only block updates while quiz is LIVE
-    // DRAFT and COMPLETED quizzes can be edited
     if (quiz.status === "LIVE") {
       return res.status(400).json({
         message: "Cannot update questions while the quiz is live",
@@ -181,9 +162,6 @@ export const updateQuestion = async (req, res) => {
   }
 };
 
-// ==========================================
-// DELETE QUESTION
-// ==========================================
 export const deleteQuestion = async (req, res) => {
   try {
     const question = await Question.findById(req.params.id);
@@ -203,8 +181,6 @@ export const deleteQuestion = async (req, res) => {
       });
     }
 
-    // Only block deletion while quiz is LIVE
-    // DRAFT and COMPLETED quizzes can be edited
     if (quiz.status === "LIVE") {
       return res.status(400).json({
         message: "Cannot delete questions while the quiz is live",

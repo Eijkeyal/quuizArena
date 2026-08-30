@@ -16,14 +16,12 @@ export const submitAnswer = async (req, res) => {
     console.log("selectedAnswer:", selectedAnswer);
     console.log("===================================\n");
 
-    // 1. Check selected answer
     if (!selectedAnswer || !selectedAnswer.trim()) {
       return res.status(400).json({
         message: "Selected answer is required",
       });
     }
 
-    // 2. Check quiz exists
     const quiz = await Quiz.findById(quizId);
 
     if (!quiz) {
@@ -34,14 +32,12 @@ export const submitAnswer = async (req, res) => {
 
     console.log("Quiz status:", quiz.status);
 
-    // 3. Quiz must be LIVE
     if (quiz.status !== "LIVE") {
       return res.status(400).json({
         message: "Quiz is not currently live",
       });
     }
 
-    // 4. Check participant
     console.log("Searching participant with:");
     console.log({
       quizId,
@@ -61,7 +57,6 @@ export const submitAnswer = async (req, res) => {
       });
     }
 
-    // 5. Get all questions in order
     const questions = await Question.find({
       quizId,
     }).sort({
@@ -78,14 +73,12 @@ export const submitAnswer = async (req, res) => {
 
     console.log("Current question:", currentQuestion._id.toString());
 
-    // 6. User can answer only the current question
     if (currentQuestion._id.toString() !== questionId.toString()) {
       return res.status(400).json({
         message: "This is not the current active question",
       });
     }
 
-    // 7. Check timer
     if (!quiz.currentQuestionStartedAt) {
       return res.status(400).json({
         message: "Question has not started yet",
@@ -102,7 +95,6 @@ export const submitAnswer = async (req, res) => {
       });
     }
 
-    // 8. Prevent answering twice
     const existingAnswer = await Answer.findOne({
       quizId,
       questionId,
@@ -115,13 +107,11 @@ export const submitAnswer = async (req, res) => {
       });
     }
 
-    // 9. Check whether answer is correct
     const isCorrect =
       selectedAnswer.trim() === currentQuestion.correctAnswer.trim();
 
     console.log("Is correct:", isCorrect);
 
-    // 10. Competitive scoring
     let pointsEarned = 0;
 
     if (isCorrect) {
@@ -144,7 +134,6 @@ export const submitAnswer = async (req, res) => {
 
     console.log("Points earned:", pointsEarned);
 
-    // 11. Save answer
     const answer = await Answer.create({
       quizId,
       questionId,
@@ -157,7 +146,6 @@ export const submitAnswer = async (req, res) => {
 
     console.log("Answer saved:", answer._id.toString());
 
-    // 12. Update participant score
     if (isCorrect) {
       participant.score += pointsEarned;
       await participant.save();
@@ -165,7 +153,6 @@ export const submitAnswer = async (req, res) => {
       console.log("Updated participant score:", participant.score);
     }
 
-    // 13. Get updated leaderboard
     const leaderboard = await QuizParticipant.find({
       quizId,
     })
@@ -175,7 +162,6 @@ export const submitAnswer = async (req, res) => {
         updatedAt: 1,
       });
 
-    // 14. Format leaderboard
     const formattedLeaderboard = leaderboard.map(
       (leaderboardParticipant, index) => ({
         rank: index + 1,
@@ -188,15 +174,12 @@ export const submitAnswer = async (req, res) => {
 
     console.log("Leaderboard:", formattedLeaderboard);
 
-    // 15. Get Socket.IO
     const io = req.app.get("io");
 
-    // 16. Send leaderboard update
     if (io) {
       io.to(`quiz:${quizId}`).emit("leaderboardUpdated", formattedLeaderboard);
     }
 
-    // 17. Send response
     return res.status(201).json({
       message: "Answer submitted successfully",
       isCorrect,

@@ -1,5 +1,3 @@
-// components/Leaderboard.jsx
-
 export default function Leaderboard({
   leaderboard = [],
   final = false,

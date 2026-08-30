@@ -19,12 +19,8 @@ export default function UserQuizPlay() {
   const [error, setError] = useState("");
   const [now, setNow] = useState(Date.now());
 
-  // Keep track of the previous question
   const previousQuestionIndex = useRef(null);
 
-  // ==========================================
-  // LOAD QUIZ AND QUESTIONS
-  // ==========================================
   useEffect(() => {
     async function loadQuiz() {
       try {
@@ -59,17 +55,12 @@ export default function UserQuizPlay() {
     loadQuiz();
   }, [quizId]);
 
-  // ==========================================
-  // REFRESH QUIZ STATE
-  // ==========================================
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
         const updatedQuiz =
           await api.getQuizById(quizId);
 
-        // Reset answer state only when
-        // admin moves to the next question
         if (
           updatedQuiz.status === "LIVE" &&
           previousQuestionIndex.current !==
@@ -94,9 +85,6 @@ export default function UserQuizPlay() {
     return () => clearInterval(interval);
   }, [quizId]);
 
-  // ==========================================
-  // LOAD FINAL RESULT AND LEADERBOARD
-  // ==========================================
   useEffect(() => {
     if (quiz?.status !== "COMPLETED") return;
 
@@ -139,9 +127,6 @@ export default function UserQuizPlay() {
     loadResults();
   }, [quiz?.status, quizId]);
 
-  // ==========================================
-  // UPDATE TIMER
-  // ==========================================
   useEffect(() => {
     if (quiz?.status !== "LIVE") return;
 
@@ -152,9 +137,6 @@ export default function UserQuizPlay() {
     return () => clearInterval(interval);
   }, [quiz?.status]);
 
-  // ==========================================
-  // LOADING
-  // ==========================================
   if (loading) {
     return (
       <div className="page">
@@ -163,9 +145,6 @@ export default function UserQuizPlay() {
     );
   }
 
-  // ==========================================
-  // ERROR BEFORE QUIZ LOADS
-  // ==========================================
   if (error && !quiz) {
     return (
       <div className="page">
@@ -174,9 +153,6 @@ export default function UserQuizPlay() {
     );
   }
 
-  // ==========================================
-  // QUIZ NOT FOUND
-  // ==========================================
   if (!quiz) {
     return (
       <div className="page">
@@ -185,17 +161,11 @@ export default function UserQuizPlay() {
     );
   }
 
-  // ==========================================
-  // GET CURRENT QUESTION
-  // ==========================================
   const currentQuestion =
     quiz.status === "LIVE"
       ? questions[quiz.currentQuestionIndex]
       : null;
 
-  // ==========================================
-  // CALCULATE REMAINING TIME
-  // ==========================================
   let remaining = 0;
 
   if (
@@ -217,9 +187,6 @@ export default function UserQuizPlay() {
     );
   }
 
-  // ==========================================
-  // SUBMIT ANSWER
-  // ==========================================
   async function onAnswer(answer) {
     if (
       selectedAnswer ||
@@ -241,7 +208,6 @@ export default function UserQuizPlay() {
 
       setAnswerResult(result);
 
-      // Update leaderboard immediately
       if (result.leaderboard) {
         setLeaderboard(result.leaderboard);
       }
@@ -271,9 +237,6 @@ export default function UserQuizPlay() {
         <p className="error">{error}</p>
       )}
 
-      {/* ==========================================
-          READY
-      ========================================== */}
       {quiz.status === "READY" && (
         <div className="card">
           <p>
@@ -285,9 +248,6 @@ export default function UserQuizPlay() {
         </div>
       )}
 
-      {/* ==========================================
-          LIVE
-      ========================================== */}
       {quiz.status === "LIVE" &&
         currentQuestion && (
           <div className="card live-card">
@@ -369,9 +329,6 @@ export default function UserQuizPlay() {
           </div>
         )}
 
-      {/* ==========================================
-          COMPLETED
-      ========================================== */}
       {quiz.status === "COMPLETED" && (
         <>
           <div className="card">
@@ -416,9 +373,6 @@ export default function UserQuizPlay() {
             )}
           </div>
 
-          {/* ==========================================
-              FINAL LEADERBOARD
-          ========================================== */}
           {leaderboard.length > 0 && (
             <div className="leaderboard">
               <div className="eyebrow">
@@ -433,9 +387,6 @@ export default function UserQuizPlay() {
         </>
       )}
 
-      {/* ==========================================
-          WAITING FOR NEXT QUESTION
-      ========================================== */}
       {quiz.status === "LIVE" &&
         !currentQuestion && (
           <div className="card">

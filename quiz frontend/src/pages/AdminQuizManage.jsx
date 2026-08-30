@@ -20,17 +20,9 @@ export default function AdminQuizManage() {
   const [quiz, setQuiz] = useState(null);
   const [questions, setQuestions] = useState([]);
 
-  // ==============================
-  // LEADERBOARD
-  // ==============================
-
   const [leaderboard, setLeaderboard] = useState([]);
   const [leaderboardLoading, setLeaderboardLoading] =
     useState(false);
-
-  // ==============================
-  // FORMS
-  // ==============================
 
   const [form, setForm] = useState(initialForm);
 
@@ -41,10 +33,6 @@ export default function AdminQuizManage() {
   const [editingQuestionId, setEditingQuestionId] =
     useState(null);
 
-  // ==============================
-  // LOADING STATES
-  // ==============================
-
   const [loading, setLoading] = useState(true);
   const [addingQuestion, setAddingQuestion] =
     useState(false);
@@ -53,10 +41,6 @@ export default function AdminQuizManage() {
     useState(false);
 
   const [error, setError] = useState("");
-
-  // ==============================
-  // LOAD QUIZ + QUESTIONS
-  // ==============================
 
   useEffect(() => {
     loadQuizData();
@@ -109,10 +93,6 @@ export default function AdminQuizManage() {
     }
   }
 
-  // ==============================
-  // RELOAD QUESTIONS
-  // ==============================
-
   async function loadQuestions() {
     const questionsData =
       await api.getQuestionsByQuiz(id);
@@ -127,10 +107,6 @@ export default function AdminQuizManage() {
 
     return loadedQuestions;
   }
-
-  // ==============================
-  // LOAD LEADERBOARD
-  // ==============================
 
   async function loadLeaderboard() {
     try {
@@ -152,10 +128,6 @@ export default function AdminQuizManage() {
       setLeaderboardLoading(false);
     }
   }
-
-  // ==============================
-  // LIVE AUTO REFRESH
-  // ==============================
 
   useEffect(() => {
     if (quiz?.status !== "LIVE") {
@@ -183,10 +155,6 @@ export default function AdminQuizManage() {
     return () => clearInterval(interval);
   }, [quiz?.status, id]);
 
-  // ==============================
-  // QUESTION FORM
-  // ==============================
-
   function handleChange(e) {
     const { name, value } = e.target;
 
@@ -196,9 +164,6 @@ export default function AdminQuizManage() {
         [name]: value,
       };
 
-      // If an option is changed and that option was
-      // previously selected as the correct answer,
-      // update the correct answer too.
       if (
         name === "opt0" ||
         name === "opt1" ||
@@ -215,10 +180,6 @@ export default function AdminQuizManage() {
       return updatedForm;
     });
   }
-
-  // ==============================
-  // ADD QUESTION
-  // ==============================
 
   async function handleAddQuestion(e) {
     e.preventDefault();
@@ -260,8 +221,6 @@ export default function AdminQuizManage() {
 
       await api.addQuestion(id, newQuestion);
 
-      // Reload from database instead of manually
-      // adding the API response to state.
       await loadQuestions();
 
       setForm(initialForm);
@@ -281,10 +240,6 @@ export default function AdminQuizManage() {
     }
   }
 
-  // ==============================
-  // EDIT QUESTION
-  // ==============================
-
   function handleEditQuestion(question) {
     setEditingQuestionId(question._id);
 
@@ -300,16 +255,11 @@ export default function AdminQuizManage() {
 
     setError("");
 
-    // Scroll to the question form
     window.scrollTo({
       top: 0,
       behavior: "smooth",
     });
   }
-
-  // ==============================
-  // UPDATE QUESTION
-  // ==============================
 
   async function handleUpdateQuestion(e) {
     e.preventDefault();
@@ -353,8 +303,6 @@ export default function AdminQuizManage() {
         updatedQuestion,
       );
 
-      // Reload questions from backend so React state
-      // exactly matches MongoDB.
       await loadQuestions();
 
       setEditingQuestionId(null);
@@ -375,10 +323,6 @@ export default function AdminQuizManage() {
     }
   }
 
-  // ==============================
-  // DELETE QUESTION
-  // ==============================
-
   async function handleDeleteQuestion(questionId) {
     const confirmed = window.confirm(
       "Are you sure you want to delete this question?",
@@ -391,7 +335,6 @@ export default function AdminQuizManage() {
 
       await api.deleteQuestion(questionId);
 
-      // Reload questions from backend.
       await loadQuestions();
 
       if (editingQuestionId === questionId) {
@@ -411,10 +354,6 @@ export default function AdminQuizManage() {
       );
     }
   }
-
-  // ==============================
-  // UPDATE QUIZ
-  // ==============================
 
   async function handleUpdateQuiz(e) {
     e.preventDefault();
@@ -458,10 +397,6 @@ export default function AdminQuizManage() {
     }
   }
 
-  // ==============================
-  // DELETE QUIZ
-  // ==============================
-
   async function handleDeleteQuiz() {
     const confirmed = window.confirm(
       "Are you sure you want to permanently delete this quiz and its questions?",
@@ -492,10 +427,6 @@ export default function AdminQuizManage() {
     }
   }
 
-  // ==============================
-  // MARK READY
-  // ==============================
-
   async function handleMarkReady() {
     try {
       setError("");
@@ -511,10 +442,6 @@ export default function AdminQuizManage() {
       );
     }
   }
-
-  // ==============================
-  // START QUIZ
-  // ==============================
 
   async function handleStartQuiz() {
     try {
@@ -536,10 +463,6 @@ export default function AdminQuizManage() {
       );
     }
   }
-
-  // ==============================
-  // RESTART QUIZ
-  // ==============================
 
   async function handleRestartQuiz() {
     const confirmed = window.confirm(
@@ -571,10 +494,6 @@ export default function AdminQuizManage() {
     }
   }
 
-  // ==============================
-  // LOADING
-  // ==============================
-
   if (loading) {
     return (
       <div className="page">
@@ -582,10 +501,6 @@ export default function AdminQuizManage() {
       </div>
     );
   }
-
-  // ==============================
-  // NOT FOUND
-  // ==============================
 
   if (!quiz) {
     return (
@@ -601,22 +516,14 @@ export default function AdminQuizManage() {
     );
   }
 
-  // ==============================
-  // PERMISSIONS BASED ON STATUS
-  // ==============================
-
-  // Questions can only be managed before the quiz starts
-  // or after the previous session has completed.
   const canManageQuestions =
     quiz.status === "DRAFT" ||
     quiz.status === "COMPLETED";
 
-  // Quiz details can also be edited in these states.
   const canEditQuiz =
     quiz.status === "DRAFT" ||
     quiz.status === "COMPLETED";
 
-  // Quiz cannot be deleted while LIVE.
   const canDelete =
     quiz.status === "DRAFT" ||
     quiz.status === "READY" ||
@@ -627,10 +534,6 @@ export default function AdminQuizManage() {
       <Link className="back" to="/admin">
         ← Back to quizzes
       </Link>
-
-      {/* ==========================
-          QUIZ HEADER
-      ========================== */}
 
       <div className="page-head">
         <div>
@@ -755,15 +658,8 @@ export default function AdminQuizManage() {
         <p className="error">{error}</p>
       )}
 
-      {/* ==========================
-          QUESTION MANAGEMENT
-          DRAFT + COMPLETED
-      ========================== */}
-
       {canManageQuestions && (
         <div className="split">
-          {/* QUESTION FORM */}
-
           <form
             className="card stack"
             onSubmit={
@@ -914,8 +810,6 @@ export default function AdminQuizManage() {
             </div>
           </form>
 
-          {/* QUESTION LIST */}
-
           <div className="card">
             <div className="eyebrow">
               Questions · {questions.length}
@@ -992,10 +886,6 @@ export default function AdminQuizManage() {
         </div>
       )}
 
-      {/* ==========================
-          READY
-      ========================== */}
-
       {quiz.status === "READY" && (
         <div className="card">
           <div className="eyebrow">
@@ -1015,10 +905,6 @@ export default function AdminQuizManage() {
           </p>
         </div>
       )}
-
-      {/* ==========================
-          LIVE
-      ========================== */}
 
       {quiz.status === "LIVE" && (
         <>
@@ -1075,10 +961,6 @@ export default function AdminQuizManage() {
           </div>
         </>
       )}
-
-      {/* ==========================
-          COMPLETED
-      ========================== */}
 
       {quiz.status === "COMPLETED" && (
         <>

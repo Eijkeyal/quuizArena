@@ -1,4 +1,3 @@
-// pages/Home.jsx — role-based landing: sends admin/user to the right dashboard
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 

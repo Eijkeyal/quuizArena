@@ -16,10 +16,6 @@ import { useAuth } from "../context/AuthContext";
 const SOCKET_URL =
   import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-// ============================================================
-// HELPERS
-// ============================================================
-
 function getId(value) {
   if (!value) return null;
 
@@ -35,9 +31,6 @@ function getMessageId(message) {
 }
 
 function getSenderId(message) {
-  // Different backends name this field differently -
-  // check every common variant so "mine vs theirs"
-  // detection doesn't silently fail.
   return getId(
     message?.senderId ??
       message?.sender ??
@@ -45,11 +38,6 @@ function getSenderId(message) {
       message?.author
   );
 }
-
-// ============================================================
-// DECODE JWT (fallback for getting the logged-in user's id
-// when the auth context doesn't expose it directly)
-// ============================================================
 
 function decodeJwt(token) {
   if (!token) return null;
@@ -100,30 +88,19 @@ function formatTime(timestamp) {
   });
 }
 
-// ============================================================
-// EXTRACT CONVERSATION
-// Handles multiple backend response formats
-// ============================================================
-
 function extractConversation(data) {
   if (!data) {
     return null;
   }
 
-  // Backend returns:
-  // { _id: "...", user1: "...", user2: "..." }
   if (data._id || data.id) {
     return data;
   }
 
-  // Backend returns:
-  // { conversation: { _id: "..." } }
   if (data.conversation) {
     return data.conversation;
   }
 
-  // Backend returns:
-  // { data: { _id: "..." } }
   if (data.data) {
     if (data.data._id || data.data.id) {
       return data.data;
@@ -137,25 +114,13 @@ function extractConversation(data) {
   return null;
 }
 
-// ============================================================
-// COMPONENT
-// ============================================================
-
 export default function UserDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // ==========================================================
-  // QUIZ STATE
-  // ==========================================================
-
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  // ==========================================================
-  // CHAT STATE
-  // ==========================================================
 
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -185,18 +150,10 @@ export default function UserDashboard() {
   const listRef = useRef(null);
   const socketRef = useRef(null);
 
-  // ==========================================================
-  // TOKEN
-  // ==========================================================
-
   const token =
     localStorage.getItem("accessToken") ||
     localStorage.getItem("token") ||
     sessionStorage.getItem("token");
-
-  // ==========================================================
-  // CURRENT USER
-  // ==========================================================
 
   const currentUserId =
     user?._id ||
@@ -207,10 +164,6 @@ export default function UserDashboard() {
     decodeJwt(token)?.userId ||
     decodeJwt(token)?.sub ||
     null;
-
-  // ==========================================================
-  // LOAD QUIZZES
-  // ==========================================================
 
   useEffect(() => {
     async function fetchQuizzes() {
@@ -247,10 +200,6 @@ export default function UserDashboard() {
 
     fetchQuizzes();
   }, []);
-
-  // ==========================================================
-  // SOCKET CONNECTION
-  // ==========================================================
 
   useEffect(() => {
     if (!token || !user) {
@@ -300,10 +249,6 @@ export default function UserDashboard() {
       setSocketConnected(false);
     });
 
-    // ========================================================
-    // NEW MESSAGE
-    // ========================================================
-
     socket.on(
       "newMessage",
       (message) => {
@@ -338,10 +283,6 @@ export default function UserDashboard() {
       }
     );
 
-    // ========================================================
-    // MESSAGE UPDATED
-    // ========================================================
-
     socket.on(
       "messageUpdated",
       (updatedMessage) => {
@@ -361,10 +302,6 @@ export default function UserDashboard() {
         );
       }
     );
-
-    // ========================================================
-    // MESSAGE DELETED
-    // ========================================================
 
     socket.on(
       "messageDeleted",
@@ -401,10 +338,6 @@ export default function UserDashboard() {
       socketRef.current = null;
     };
   }, [token, user]);
-
-  // ==========================================================
-  // JOIN CONVERSATION ROOM
-  // ==========================================================
 
   useEffect(() => {
     const conversationId =
@@ -443,10 +376,6 @@ export default function UserDashboard() {
     conversation,
     socketConnected,
   ]);
-
-  // ==========================================================
-  // OPEN CHAT
-  // ==========================================================
 
   async function openChat() {
     setChatOpen(true);
@@ -488,10 +417,6 @@ export default function UserDashboard() {
     }
   }
 
-  // ==========================================================
-  // SELECT USER
-  // ==========================================================
-
   async function selectUser(otherUser) {
     const otherUserId =
       getId(otherUser);
@@ -527,11 +452,6 @@ export default function UserDashboard() {
         response
       );
 
-      // IMPORTANT:
-      // Handles:
-      // response._id
-      // response.conversation._id
-      // response.data._id
       const conversationData =
         extractConversation(
           response
@@ -571,10 +491,6 @@ export default function UserDashboard() {
         conversationData
       );
 
-      // ======================================================
-      // LOAD OLD MESSAGES
-      // ======================================================
-
       const messageResponse =
         await api.getMessages(
           conversationId
@@ -584,11 +500,6 @@ export default function UserDashboard() {
         "Messages response:",
         messageResponse
       );
-
-      // Support:
-      // []
-      // { messages: [] }
-      // { data: [] }
 
       let loadedMessages = [];
 
@@ -637,10 +548,6 @@ export default function UserDashboard() {
     }
   }
 
-  // ==========================================================
-  // BACK TO USERS
-  // ==========================================================
-
   function backToUsers() {
     const conversationId =
       getId(conversation);
@@ -663,10 +570,6 @@ export default function UserDashboard() {
 
     setChatError("");
   }
-
-  // ==========================================================
-  // SEND MESSAGE
-  // ==========================================================
 
   async function sendMessage() {
     const content =
@@ -713,8 +616,6 @@ export default function UserDashboard() {
 
       setDraft("");
 
-      // In case Socket.IO does not broadcast
-      // the message back, immediately add it.
       const createdMessage =
         response?.message ||
         response?.data ||
@@ -768,10 +669,6 @@ export default function UserDashboard() {
     }
   }
 
-  // ==========================================================
-  // START EDIT
-  // ==========================================================
-
   function startEdit(message) {
     const messageId =
       getMessageId(message);
@@ -789,18 +686,10 @@ export default function UserDashboard() {
     setPendingDeleteId(null);
   }
 
-  // ==========================================================
-  // CANCEL EDIT
-  // ==========================================================
-
   function cancelEdit() {
     setEditingId(null);
     setEditDraft("");
   }
-
-  // ==========================================================
-  // SAVE EDIT
-  // ==========================================================
 
   async function saveEdit(
     messageId
@@ -834,10 +723,6 @@ export default function UserDashboard() {
       );
     }
   }
-
-  // ==========================================================
-  // DELETE MESSAGE
-  // ==========================================================
 
   async function confirmDelete(
     messageId
@@ -874,10 +759,6 @@ export default function UserDashboard() {
     }
   }
 
-  // ==========================================================
-  // MESSAGE OWNER
-  // ==========================================================
-
   function isMyMessage(message) {
     if (!currentUserId) {
       return false;
@@ -891,10 +772,6 @@ export default function UserDashboard() {
     );
   }
 
-  // ==========================================================
-  // AUTO SCROLL
-  // ==========================================================
-
   useEffect(() => {
     if (!listRef.current) {
       return;
@@ -905,10 +782,6 @@ export default function UserDashboard() {
       behavior: "smooth",
     });
   }, [messages]);
-
-  // ==========================================================
-  // JOIN QUIZ
-  // ==========================================================
 
   async function onJoin(quizId) {
     try {
@@ -941,10 +814,6 @@ export default function UserDashboard() {
     }
   }
 
-  // ==========================================================
-  // LOADING
-  // ==========================================================
-
   if (loading) {
     return (
       <div className="page">
@@ -955,16 +824,8 @@ export default function UserDashboard() {
     );
   }
 
-  // ==========================================================
-  // UI
-  // ==========================================================
-
   return (
     <div className="page">
-      {/* ====================================================
-          QUIZZES
-      ==================================================== */}
-
       <div className="eyebrow">
         Player Lobby
       </div>
@@ -1031,10 +892,6 @@ export default function UserDashboard() {
         </p>
       )}
 
-      {/* ====================================================
-          CHAT BUTTON
-      ==================================================== */}
-
       <div
         style={
           styles.chatWrapper
@@ -1058,18 +915,12 @@ export default function UserDashboard() {
           />
         </button>
 
-        {/* ==================================================
-            CHAT PANEL
-        ================================================== */}
-
         {chatOpen && (
           <div
             style={
               styles.panel
             }
           >
-            {/* HEADER */}
-
             <div
               style={
                 styles.header
@@ -1140,8 +991,6 @@ export default function UserDashboard() {
               </button>
             </div>
 
-            {/* ERROR */}
-
             {chatError && (
               <div
                 style={
@@ -1151,10 +1000,6 @@ export default function UserDashboard() {
                 {chatError}
               </div>
             )}
-
-            {/* =================================================
-                USER LIST
-            ================================================= */}
 
             {!selectedUser ? (
               <div
@@ -1249,10 +1094,6 @@ export default function UserDashboard() {
               </div>
             ) : (
               <>
-                {/* =================================================
-                    MESSAGE LIST
-                ================================================= */}
-
                 <div
                   style={
                     styles.list
@@ -1553,10 +1394,6 @@ export default function UserDashboard() {
                   )}
                 </div>
 
-                {/* =================================================
-                    MESSAGE INPUT
-                ================================================= */}
-
                 <div
                   style={
                     styles.inputRow
@@ -1614,10 +1451,6 @@ export default function UserDashboard() {
     </div>
   );
 }
-
-// ============================================================
-// STYLES
-// ============================================================
 
 const styles = {
   chatWrapper: {

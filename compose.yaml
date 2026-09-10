@@ -1,0 +1,42 @@
+services:
+  backend:
+    build:
+      context: "./quiz backend"
+      dockerfile: Dockerfile
+
+    container_name: quiz-backend
+
+    ports:
+      - "3000:3000"
+
+    env_file:
+      - "./quiz backend/.env"
+
+    networks:
+      - quiznet
+
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: "./quiz frontend"
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000
+
+    container_name: quiz-frontend
+
+    ports:
+      - "8080:80"
+
+    depends_on:
+      - backend
+
+    networks:
+      - quiznet
+
+    restart: unless-stopped
+
+networks:
+  quiznet:
+    driver: bridge

@@ -1,5 +1,5 @@
 import Message from "../models/message.js";
-import Conversation from "../models/Conversation.js";
+import Conversation from "../models/conversation.js";
 
 // message create
 export const createMessage = async (req, res) => {
@@ -42,7 +42,7 @@ export const createMessage = async (req, res) => {
     // Update conversation activity time
     conversation.updatedAt = new Date();
     await conversation.save();
-    //broadcast messages in real time 
+    //broadcast messages in real time
     const io = req.app.get("io");
 
     if (io) {

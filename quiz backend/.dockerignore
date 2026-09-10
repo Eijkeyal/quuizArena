@@ -1,0 +1,4 @@
+node_modules;
+npm - debug.log.env.git.gitignore.vscode;
+testSocket.js;
+README.md;

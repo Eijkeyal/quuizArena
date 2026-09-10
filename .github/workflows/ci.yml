@@ -58,10 +58,8 @@ jobs:
         run: npm run build
         env:
           VITE_API_URL: http://localhost:3000
-
-  # ==========================================
   # Build & push Docker images
-  # ==========================================
+
   docker-build-push:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest

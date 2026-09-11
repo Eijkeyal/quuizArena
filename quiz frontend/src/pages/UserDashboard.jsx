@@ -12,19 +12,14 @@ import { io } from "socket.io-client";
 import * as api from "../api";
 import { useAuth } from "../context/AuthContext";
 
-// ============================================================
-// CONFIG
-// ============================================================
 
-const SOCKET_URL = "http://localhost:3000";
+const SOCKET_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 // Use the conversation that should be used for the lobby chat.
 // Change this to your real conversation ID.
 const CONVERSATION_ID = "6a834a191a6282676e99c9c5";
 
-// ============================================================
-// HELPERS
-// ============================================================
+
 
 function getMessageId(message) {
   return message?._id || message?.id;
